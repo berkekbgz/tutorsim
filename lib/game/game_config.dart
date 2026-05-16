@@ -30,6 +30,13 @@ class GameConfig {
   static const double tabletWidth = 36;
   static const double tabletHeight = 26;
 
+  // Events
+  static const double firstEventDelay = 4;
+  static const double eventIntervalMin = 5;
+  static const double eventIntervalMax = 10;
+  static const int maxActiveEvents = 3;
+  static const double bottleEventVisibleSeconds = 7;
+
   // Shift / HUD initial values
   static const double shiftSeconds = 300; // 5-minute shift
   static const int startReputation = 100;

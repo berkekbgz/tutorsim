@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'game_config.dart';
+import 'events/game_event_manager.dart';
 import 'sprites.dart';
 import 'students/student_factory.dart';
 import 'students/student_npc.dart';
@@ -63,6 +64,7 @@ class TutorSimGame extends FlameGame {
     // Wait for room.onLoad so seats are populated before factory runs.
     await room.loaded;
     await _spawnStudents(initialStudentLogins);
+    await world.add(GameEventManager(this));
 
     camera.viewfinder.zoom = GameConfig.cameraZoom;
     camera.follow(_tutor);
@@ -114,6 +116,11 @@ class TutorSimGame extends FlameGame {
 
   void setTutorLogin(String login) {
     _tutor.setLogin(login);
+  }
+
+  StudentNpc? studentAtSeat(int seatIndex) {
+    if (seatIndex < 0 || seatIndex >= _students.length) return null;
+    return _students[seatIndex];
   }
 
   Future<void> _spawnStudents(List<String> logins) async {

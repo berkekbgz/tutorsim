@@ -40,4 +40,10 @@ class StudentNpc extends PositionComponent {
       NameTag(text: login, position: Vector2(GameConfig.studentRadius, -4)),
     );
   }
+
+  // Kept as a safe no-op so stale hot-reload code cannot crash if it still
+  // calls the old NPC-local event mark API. Event marks now live in world space.
+  Future<void> showEventMark() async {}
+
+  void hideEventMark() {}
 }

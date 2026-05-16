@@ -21,6 +21,12 @@ class ClusterRoom extends PositionComponent {
   /// Where students sit (one per desk slot, in row-major order).
   final List<Vector2> seats = [];
 
+  /// Desk positions where event props can appear.
+  final List<Vector2> eventSpots = [];
+
+  /// Seat index associated with each event spot.
+  final List<int> eventSeatIndices = [];
+
   /// Direction each seated student should face based on table side.
   final List<CharacterDirection> seatDirections = [];
 
@@ -81,11 +87,29 @@ class ClusterRoom extends PositionComponent {
             ? benchY - GameConfig.studentRadius - 6
             : benchY + GameConfig.deskHeight + GameConfig.studentRadius + 6;
         seats.add(Vector2(seatX, seatY));
-        seatDirections.add(
-          screenFacesUp ? CharacterDirection.down : CharacterDirection.up,
+        final seatDirection = screenFacesUp
+            ? CharacterDirection.down
+            : CharacterDirection.up;
+        seatDirections.add(seatDirection);
+        eventSpots.add(
+          _eventSpotForScreen(
+            Rect.fromLTWH(accX, accY, accW, accH),
+            seatDirection,
+          ),
         );
+        eventSeatIndices.add(seats.length - 1);
       }
     }
+  }
+
+  Vector2 _eventSpotForScreen(Rect screen, CharacterDirection npcDirection) {
+    const bottleSize = 24.0;
+    const margin = 4.0;
+    final x = npcDirection == CharacterDirection.up
+        ? screen.left - bottleSize / 2 - margin
+        : screen.right + bottleSize / 2 + margin;
+
+    return Vector2(x, screen.center.dy);
   }
 
   /// True if a circle at [center] with [radius] overlaps any bench.
