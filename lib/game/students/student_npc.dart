@@ -1,7 +1,7 @@
 import 'package:flame/components.dart';
-import 'package:flutter/painting.dart';
 
 import '../game_config.dart';
+import '../name_tag.dart';
 import '../sprites.dart';
 
 class StudentNpc extends PositionComponent {
@@ -28,9 +28,6 @@ class StudentNpc extends PositionComponent {
         .toList();
     final row = pool[login.hashCode.abs() % pool.length];
 
-    print(
-      "${login} : character row $row , position $position",
-    ); // Debug log to verify deterministic character assignment and correct seating positions.
     await add(
       SpriteComponent(
         sprite: CharacterSprites.character(row, direction: direction),
@@ -39,27 +36,8 @@ class StudentNpc extends PositionComponent {
       ),
     );
 
-    // Login label floats above the head.
     await add(
-      TextComponent(
-        text: login,
-        anchor: Anchor.bottomCenter,
-        position: Vector2(GameConfig.studentRadius, -4),
-        textRenderer: TextPaint(
-          style: const TextStyle(
-            color: Color(0xFFFFFFFF),
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            shadows: [
-              Shadow(
-                blurRadius: 2,
-                color: Color(0xCC000000),
-                offset: Offset(0, 1),
-              ),
-            ],
-          ),
-        ),
-      ),
+      NameTag(text: login, position: Vector2(GameConfig.studentRadius, -4)),
     );
   }
 }

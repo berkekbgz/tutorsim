@@ -1,17 +1,18 @@
-import '../game_config.dart';
 import '../world/cluster_room.dart';
 import 'student_npc.dart';
 
 /// Spawns the MVP student roster: one student per login from
-/// [GameConfig.studentLogins], seated at the first N desks.
+/// the given login list, seated at the first N desks.
 class StudentFactory {
-  StudentFactory(this.room);
+  StudentFactory(this.room, this.logins);
 
   final ClusterRoom room;
+  final List<String> logins;
 
   List<StudentNpc> spawnAll() {
     final result = <StudentNpc>[];
-    final logins = GameConfig.studentLogins;
+    if (logins.isEmpty) return result;
+
     final count = logins.length < room.seats.length
         ? logins.length
         : room.seats.length;

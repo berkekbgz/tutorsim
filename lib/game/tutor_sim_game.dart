@@ -6,10 +6,17 @@ import 'package:flutter/services.dart';
 import 'game_config.dart';
 import 'sprites.dart';
 import 'students/student_factory.dart';
+import 'students/student_npc.dart';
 import 'tutor/tutor_player.dart';
 import 'world/cluster_room.dart';
 
 class TutorSimGame extends FlameGame {
+  TutorSimGame({required this.tutorLogin, required List<String> studentLogins})
+    : initialStudentLogins = List.unmodifiable(studentLogins);
+
+  final String tutorLogin;
+  final List<String> initialStudentLogins;
+
   late final ClusterRoom room;
 
   /// Live set of keys the player is holding. Maintained by main.dart's
@@ -31,6 +38,11 @@ class TutorSimGame extends FlameGame {
   /// can immediately see whether key tracking is healthy.
   final ValueNotifier<String> inputDebug = ValueNotifier<String>('-');
 
+  final List<StudentNpc> _students = [];
+  late final TutorPlayer _tutor;
+
+  int get studentSeatCount => room.seats.length;
+
   @override
   Future<void> onLoad() async {
     await CharacterSprites.load();
@@ -40,22 +52,20 @@ class TutorSimGame extends FlameGame {
 
     // Spawn in the walkway between the first two bench rows, not at the
     // room's geometric center (which would overlap a bench).
-    final tutor = TutorPlayer(
+    _tutor = TutorPlayer(
       position: Vector2(GameConfig.roomWidth / 2, 160),
       room: room,
       heldKeys: heldKeys,
     );
-    await world.add(tutor);
+    await world.add(_tutor);
+    _tutor.setLogin(tutorLogin);
 
     // Wait for room.onLoad so seats are populated before factory runs.
     await room.loaded;
-    final students = StudentFactory(room).spawnAll();
-    for (final s in students) {
-      await world.add(s);
-    }
+    await _spawnStudents(initialStudentLogins);
 
     camera.viewfinder.zoom = GameConfig.cameraZoom;
-    camera.follow(tutor);
+    camera.follow(_tutor);
     camera.setBounds(
       Rectangle.fromLTWH(0, 0, GameConfig.roomWidth, GameConfig.roomHeight),
     );
@@ -91,4 +101,26 @@ class TutorSimGame extends FlameGame {
 
   bool _held(LogicalKeyboardKey a, LogicalKeyboardKey b) =>
       heldKeys.contains(a) || heldKeys.contains(b);
+
+  Future<void> setStudentLogins(List<String> logins) async {
+    if (logins.isEmpty) return;
+    await room.loaded;
+    for (final student in _students) {
+      student.removeFromParent();
+    }
+    _students.clear();
+    await _spawnStudents(logins);
+  }
+
+  void setTutorLogin(String login) {
+    _tutor.setLogin(login);
+  }
+
+  Future<void> _spawnStudents(List<String> logins) async {
+    final students = StudentFactory(room, logins).spawnAll();
+    _students.addAll(students);
+    for (final student in students) {
+      await world.add(student);
+    }
+  }
 }

@@ -2,6 +2,7 @@ import 'package:flame/components.dart';
 import 'package:flutter/services.dart';
 
 import '../game_config.dart';
+import '../name_tag.dart';
 import '../sprites.dart';
 import '../world/cluster_room.dart';
 
@@ -28,6 +29,7 @@ class TutorPlayer extends PositionComponent {
   final Vector2 _input = Vector2.zero();
 
   late final SpriteAnimationComponent _sprite;
+  late final NameTag _loginLabel;
   late final Map<CharacterDirection, SpriteAnimation> _idleAnims;
   late final Map<CharacterDirection, SpriteAnimation> _walkAnims;
   CharacterDirection _facing = CharacterDirection.down;
@@ -50,6 +52,16 @@ class TutorPlayer extends PositionComponent {
       playing: false,
     );
     await add(_sprite);
+
+    _loginLabel = NameTag(
+      text: '',
+      position: Vector2(GameConfig.tutorRadius, -4),
+    );
+    await add(_loginLabel);
+  }
+
+  void setLogin(String login) {
+    _loginLabel.text = login;
   }
 
   @override

@@ -21,6 +21,8 @@ class GameConfig {
   static const double studentRadius = 16;
 
   // Desk + accessories
+  static const int deskCols = 4;
+  static const int deskRows = 8;
   static const double deskWidth = 120;
   static const double deskHeight = 40;
   static const double computerWidth = 32;

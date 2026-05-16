@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import 'game/tutor_sim_game.dart';
 import 'game/ui/hud_overlay.dart';
+import 'game/ui/auth_overlay.dart';
 
 void main() {
   runApp(const TutorSimApp());
@@ -17,7 +18,7 @@ class TutorSimApp extends StatefulWidget {
 }
 
 class _TutorSimAppState extends State<TutorSimApp> {
-  late final TutorSimGame _game = TutorSimGame();
+  TutorSimGame? _game;
 
   @override
   void initState() {
@@ -36,9 +37,9 @@ class _TutorSimAppState extends State<TutorSimApp> {
   // Web (the set briefly empties around key repeats and focus changes).
   bool _onKey(KeyEvent event) {
     if (event is KeyDownEvent) {
-      _game.heldKeys.add(event.logicalKey);
+      _game?.heldKeys.add(event.logicalKey);
     } else if (event is KeyUpEvent) {
-      _game.heldKeys.remove(event.logicalKey);
+      _game?.heldKeys.remove(event.logicalKey);
     }
     // KeyRepeatEvent: key is already in the set, nothing to do.
     return false;
@@ -46,20 +47,33 @@ class _TutorSimAppState extends State<TutorSimApp> {
 
   @override
   Widget build(BuildContext context) {
+    final game = _game;
+
     return MaterialApp(
       title: 'TutorSim',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(useMaterial3: true),
-      home: Scaffold(
-        backgroundColor: const Color(0xFF0B0E14),
-        body: GameWidget<TutorSimGame>(
-          game: _game,
-          overlayBuilderMap: {
-            'hud': (context, game) => HudOverlay(game: game),
-          },
-          initialActiveOverlays: const ['hud'],
-        ),
-      ),
+      home: game == null
+          ? LoginPage(
+              onAuthenticated: (data) {
+                setState(() {
+                  _game = TutorSimGame(
+                    tutorLogin: data.user.login,
+                    studentLogins: data.studentLogins,
+                  );
+                });
+              },
+            )
+          : Scaffold(
+              backgroundColor: const Color(0xFF0B0E14),
+              body: GameWidget<TutorSimGame>(
+                game: game,
+                overlayBuilderMap: {
+                  'hud': (context, game) => HudOverlay(game: game),
+                },
+                initialActiveOverlays: const ['hud'],
+              ),
+            ),
     );
   }
 }

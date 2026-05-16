@@ -28,8 +28,8 @@ class ClusterRoom extends PositionComponent {
   /// the photo / violation systems later.
   final List<DeskAccessory> accessories = [];
 
-  static const int _cols = 4;
-  static const int _rows = 8;
+  static const int _cols = GameConfig.deskCols;
+  static const int _rows = GameConfig.deskRows;
   static const double _benchCenterX =
       GameConfig.roomWidth / 2 + GameConfig.wallThickness;
   static const double _benchStartY = 300;
