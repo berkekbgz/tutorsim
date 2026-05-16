@@ -36,6 +36,8 @@ class GameConfig {
   static const double eventIntervalMax = 10;
   static const int maxActiveEvents = 3;
   static const double bottleEventVisibleSeconds = 7;
+  static const double eventCaptureRadius = 72;
+  static const int tigHoursPerCapture = 2;
 
   // Shift / HUD initial values
   static const double shiftSeconds = 300; // 5-minute shift

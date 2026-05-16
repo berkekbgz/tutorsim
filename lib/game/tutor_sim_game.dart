@@ -38,9 +38,13 @@ class TutorSimGame extends FlameGame {
   /// Debug echo of the active movement keys. Visible in the HUD so we
   /// can immediately see whether key tracking is healthy.
   final ValueNotifier<String> inputDebug = ValueNotifier<String>('-');
+  final ValueNotifier<String?> tigToast = ValueNotifier<String?>(null);
 
   final List<StudentNpc> _students = [];
   late final TutorPlayer _tutor;
+  late final GameEventManager _eventManager;
+  final Map<String, int> _tigHoursByLogin = {};
+  double _tigToastTimer = 0;
 
   int get studentSeatCount => room.seats.length;
 
@@ -64,7 +68,8 @@ class TutorSimGame extends FlameGame {
     // Wait for room.onLoad so seats are populated before factory runs.
     await room.loaded;
     await _spawnStudents(initialStudentLogins);
-    await world.add(GameEventManager(this));
+    _eventManager = GameEventManager(this);
+    await world.add(_eventManager);
 
     camera.viewfinder.zoom = GameConfig.cameraZoom;
     camera.follow(_tutor);
@@ -99,6 +104,22 @@ class TutorSimGame extends FlameGame {
         GameConfig.shiftSeconds,
       );
     }
+
+    if (_tigToastTimer > 0) {
+      _tigToastTimer -= dt;
+      if (_tigToastTimer <= 0) tigToast.value = null;
+    }
+  }
+
+  void captureCurrentEvent() {
+    final student = _eventManager.captureNearest(_tutor.position);
+    if (student == null) return;
+
+    final hours =
+        (_tigHoursByLogin[student.login] ?? 0) + GameConfig.tigHoursPerCapture;
+    _tigHoursByLogin[student.login] = hours;
+    tigToast.value = '${student.login} got $hours-hour TIG';
+    _tigToastTimer = 3;
   }
 
   bool _held(LogicalKeyboardKey a, LogicalKeyboardKey b) =>

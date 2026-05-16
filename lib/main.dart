@@ -38,6 +38,9 @@ class _TutorSimAppState extends State<TutorSimApp> {
   bool _onKey(KeyEvent event) {
     if (event is KeyDownEvent) {
       _game?.heldKeys.add(event.logicalKey);
+      if (event.logicalKey == LogicalKeyboardKey.space) {
+        _game?.captureCurrentEvent();
+      }
     } else if (event is KeyUpEvent) {
       _game?.heldKeys.remove(event.logicalKey);
     }

@@ -17,48 +17,89 @@ class HudOverlay extends StatelessWidget {
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(12),
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xCC0E1219),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF2A3142), width: 1),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ValueListenableBuilder<int>(
-                  valueListenable: game.score,
-                  builder: (_, v, _) =>
-                      _Stat(label: 'SCORE', value: v.toString()),
-                ),
-                const _Divider(),
-                ValueListenableBuilder<int>(
-                  valueListenable: game.reputation,
-                  builder: (_, v, _) => _Stat(
-                    label: 'REP',
-                    value: v.toString(),
-                    valueColor: _reputationColor(v),
+          child: Stack(
+            children: [
+              Align(
+                alignment: Alignment.topCenter,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xCC0E1219),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFF2A3142),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ValueListenableBuilder<int>(
+                        valueListenable: game.score,
+                        builder: (_, v, _) =>
+                            _Stat(label: 'SCORE', value: v.toString()),
+                      ),
+                      const _Divider(),
+                      ValueListenableBuilder<int>(
+                        valueListenable: game.reputation,
+                        builder: (_, v, _) => _Stat(
+                          label: 'REP',
+                          value: v.toString(),
+                          valueColor: _reputationColor(v),
+                        ),
+                      ),
+                      const _Divider(),
+                      ValueListenableBuilder<double>(
+                        valueListenable: game.timeLeft,
+                        builder: (_, v, _) =>
+                            _Stat(label: 'TIME', value: _formatTime(v)),
+                      ),
+                      const _Divider(),
+                      ValueListenableBuilder<String>(
+                        valueListenable: game.inputDebug,
+                        builder: (_, v, _) => _Stat(label: 'INPUT', value: v),
+                      ),
+                    ],
                   ),
                 ),
-                const _Divider(),
-                ValueListenableBuilder<double>(
-                  valueListenable: game.timeLeft,
-                  builder: (_, v, _) =>
-                      _Stat(label: 'TIME', value: _formatTime(v)),
+              ),
+              Align(
+                alignment: Alignment.topRight,
+                child: ValueListenableBuilder<String?>(
+                  valueListenable: game.tigToast,
+                  builder: (_, message, _) {
+                    if (message == null) return const SizedBox.shrink();
+                    return Container(
+                      margin: const EdgeInsets.only(top: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xDD111722),
+                        border: Border.all(
+                          color: const Color(0xFFFFC03A),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        message,
+                        style: const TextStyle(
+                          color: Color(0xFFFFFFFF),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    );
+                  },
                 ),
-                const _Divider(),
-                ValueListenableBuilder<String>(
-                  valueListenable: game.inputDebug,
-                  builder: (_, v, _) => _Stat(label: 'INPUT', value: v),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-      ),
       ),
     );
   }
@@ -78,11 +119,7 @@ class HudOverlay extends StatelessWidget {
 }
 
 class _Stat extends StatelessWidget {
-  const _Stat({
-    required this.label,
-    required this.value,
-    this.valueColor,
-  });
+  const _Stat({required this.label, required this.value, this.valueColor});
 
   final String label;
   final String value;
@@ -121,9 +158,9 @@ class _Divider extends StatelessWidget {
   const _Divider();
   @override
   Widget build(BuildContext context) => Container(
-        width: 1,
-        height: 28,
-        margin: const EdgeInsets.symmetric(horizontal: 14),
-        color: const Color(0xFF2A3142),
-      );
+    width: 1,
+    height: 28,
+    margin: const EdgeInsets.symmetric(horizontal: 14),
+    color: const Color(0xFF2A3142),
+  );
 }
