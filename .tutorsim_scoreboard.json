@@ -38,6 +38,15 @@
     },
     {
       "login": "bkabagoz",
+      "score": 1450,
+      "correct_tigs": 16,
+      "missed_events": 5,
+      "elapsed_seconds": 110,
+      "peak_difficulty": 2.104431999999969,
+      "submitted_at": "2026-05-17T17:04:38.634265Z"
+    },
+    {
+      "login": "bkabagoz",
       "score": 1190,
       "correct_tigs": 14,
       "missed_events": 7,
@@ -128,6 +137,15 @@
     },
     {
       "login": "bkabagoz",
+      "score": 10,
+      "correct_tigs": 1,
+      "missed_events": 4,
+      "elapsed_seconds": 42,
+      "peak_difficulty": 1.4275689999999988,
+      "submitted_at": "2026-05-17T16:55:53.403485Z"
+    },
+    {
+      "login": "bkabagoz",
       "score": 0,
       "correct_tigs": 1,
       "missed_events": 5,
@@ -208,7 +226,7 @@
     "yagunduz": 1,
     "milenas": 1,
     "mesalman": 1,
-    "ssarican": 1,
+    "ssarican": 2,
     "udemirci": 2,
     "agurses": 1,
     "aunverdi": 1,
@@ -233,6 +251,12 @@
     "ekibar": 1,
     "zeyildir": 1,
     "garslan": 1,
-    "vzeybek": 1
+    "vzeybek": 1,
+    "tcebeci": 2,
+    "bahkaya": 1,
+    "akivam": 1,
+    "ergeson": 2,
+    "hzulkadi": 1,
+    "ukuruder": 1
   }
 }

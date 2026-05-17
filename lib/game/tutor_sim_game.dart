@@ -37,9 +37,10 @@ class TutorSimGame extends FlameGame {
   static const _sfxBossHit = 'Boss hit 1.wav';
   static const _sfxAlarm = 'Digital_Alarm.wav';
   static const _sfxSplash = 'Water_Splash.wav';
-  // Digital_Alarm.wav is ~2.5s; clip the tail so only the opening beep
-  // plays as a warning, per the spec.
-  static const _alarmHalfMs = 800;
+
+  static final AudioContext _sfxAudioContext = AudioContextConfig(
+    focus: AudioContextConfigFocus.mixWithOthers,
+  ).build();
 
   late final ClusterRoom room;
 
@@ -115,6 +116,10 @@ class TutorSimGame extends FlameGame {
   bool _endingMusic = false;
   AudioPlayer? _introPlayer;
   AudioPlayer? _endPlayer;
+  AudioPool? _bumpPool;
+  AudioPool? _bossHitPool;
+  AudioPool? _alarmPool;
+  AudioPool? _splashPool;
   double _elapsed = 0;
   double _shakeMagnitude = 0;
   double _shakeTimeLeft = 0;
@@ -156,6 +161,10 @@ class TutorSimGame extends FlameGame {
     unawaited(FlameAudio.bgm.stop());
     unawaited(_introPlayer?.dispose() ?? Future<void>.value());
     unawaited(_endPlayer?.dispose() ?? Future<void>.value());
+    unawaited(_bumpPool?.dispose() ?? Future<void>.value());
+    unawaited(_bossHitPool?.dispose() ?? Future<void>.value());
+    unawaited(_alarmPool?.dispose() ?? Future<void>.value());
+    unawaited(_splashPool?.dispose() ?? Future<void>.value());
     super.onRemove();
   }
 
@@ -254,16 +263,7 @@ class TutorSimGame extends FlameGame {
     _musicStarted = true;
     FlameAudio.updatePrefix('assets/');
     await FlameAudio.bgm.initialize();
-    // Preload SFX so the first hit/capture/miss doesn't stutter while
-    // audioplayers decodes the file on the audio thread.
-    unawaited(
-      FlameAudio.audioCache.loadAll([
-        _sfxBump,
-        _sfxBossHit,
-        _sfxAlarm,
-        _sfxSplash,
-      ]),
-    );
+    await _prepareSfxPools();
     _introPlayer = await FlameAudio.playLongAudio(
       _musicIntro,
       volume: _musicVolume,
@@ -271,41 +271,121 @@ class TutorSimGame extends FlameGame {
     unawaited(_startLoopAfterIntro(_introPlayer!));
   }
 
+  Future<void> _prepareSfxPools() async {
+    final pools = await Future.wait([
+      _createSfxPool(_sfxBump, minPlayers: 3, maxPlayers: 6),
+      _createSfxPool(_sfxBossHit, minPlayers: 2, maxPlayers: 4),
+      _createSfxPool(_sfxAlarm, minPlayers: 2, maxPlayers: 3),
+      _createSfxPool(_sfxSplash, minPlayers: 2, maxPlayers: 4),
+    ]);
+    _bumpPool = pools[0];
+    _bossHitPool = pools[1];
+    _alarmPool = pools[2];
+    _splashPool = pools[3];
+  }
+
+  Future<AudioPool> _createSfxPool(
+    String filename, {
+    required int minPlayers,
+    required int maxPlayers,
+  }) {
+    return AudioPool.create(
+      source: AssetSource(filename),
+      audioCache: FlameAudio.audioCache,
+      minPlayers: minPlayers,
+      maxPlayers: maxPlayers,
+      playerMode: PlayerMode.lowLatency,
+      audioContext: _sfxAudioContext,
+    );
+  }
+
   Future<void> _playSfx(String filename, {double volume = 0.7}) async {
     if (gameOver.value && filename != _sfxBossHit) return;
     try {
-      await FlameAudio.play(filename, volume: volume);
+      final pool = _sfxPoolFor(filename);
+      if (pool == null) {
+        await FlameAudio.play(filename, volume: volume);
+        return;
+      }
+
+      await _startPooledSfx(pool, filename, volume: volume);
     } catch (error) {
       debugPrint('SFX $filename failed: $error');
     }
   }
 
-  Future<AudioPlayer?> _playSfxClipped(
+  void notifyDeskEventStarted() {
+    unawaited(_playSfx(_sfxBump, volume: 0.75));
+  }
+
+  AudioPool? _sfxPoolFor(String filename) {
+    return switch (filename) {
+      _sfxBump => _bumpPool,
+      _sfxBossHit => _bossHitPool,
+      _sfxAlarm => _alarmPool,
+      _sfxSplash => _splashPool,
+      _ => null,
+    };
+  }
+
+  Duration _sfxAutoStopDelay(String filename) {
+    return switch (filename) {
+      _sfxBossHit => const Duration(milliseconds: 350),
+      _sfxBump => const Duration(milliseconds: 250),
+      _sfxSplash => const Duration(milliseconds: 550),
+      _sfxAlarm => const Duration(milliseconds: 800),
+      _ => const Duration(milliseconds: 1000),
+    };
+  }
+
+  /// Called by [GameEventManager] when an active event is about to
+  /// expire. Plays only the opening 800ms of the alarm. The caller gets
+  /// back a stop function so it can cut the alarm early if the player
+  /// captures the event before the clip ends.
+  Future<StopFunction?> notifyEventAboutToExpire() {
+    if (gameOver.value) return Future.value(null);
+    return _playSfxWithStop(_sfxAlarm, volume: 0.55);
+  }
+
+  Future<StopFunction?> _playSfxWithStop(
     String filename, {
-    required int clipMs,
     double volume = 0.7,
   }) async {
     if (gameOver.value) return null;
     try {
-      final player = await FlameAudio.play(filename, volume: volume);
-      Future.delayed(Duration(milliseconds: clipMs), () {
-        unawaited(player.stop());
-      });
-      return player;
+      final pool = _sfxPoolFor(filename);
+      if (pool == null) {
+        final player = await FlameAudio.play(filename, volume: volume);
+        return player.stop;
+      }
+
+      return _startPooledSfx(pool, filename, volume: volume);
     } catch (error) {
       debugPrint('SFX $filename failed: $error');
       return null;
     }
   }
 
-  /// Called by [GameEventManager] when an active event is about to
-  /// expire. Plays only the leading beep of the alarm so it reads as
-  /// "hurry" rather than a full alert siren. The caller gets back the
-  /// [AudioPlayer] so it can [AudioPlayer.stop] it early if the player
-  /// captures the event before the clip naturally ends.
-  Future<AudioPlayer?> notifyEventAboutToExpire() {
-    if (gameOver.value) return Future.value(null);
-    return _playSfxClipped(_sfxAlarm, clipMs: _alarmHalfMs, volume: 0.55);
+  Future<StopFunction> _startPooledSfx(
+    AudioPool pool,
+    String filename, {
+    required double volume,
+  }) async {
+    final rawStop = await pool.start(volume: volume);
+    var stopped = false;
+    Timer? timer;
+
+    Future<void> stop() async {
+      if (stopped) return;
+      stopped = true;
+      timer?.cancel();
+      await rawStop();
+    }
+
+    timer = Timer(_sfxAutoStopDelay(filename), () {
+      unawaited(stop());
+    });
+    return stop;
   }
 
   Future<void> _startLoopAfterIntro(AudioPlayer introPlayer) async {

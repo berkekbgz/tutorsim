@@ -34,19 +34,20 @@ class GameEventManager extends Component {
       active.elapsed += dt;
       if (!active.warned &&
           active.elapsed >=
-              active.visibleSeconds - GameConfig.eventExpiryWarningLeadSeconds) {
+              active.visibleSeconds -
+                  GameConfig.eventExpiryWarningLeadSeconds) {
         active.warned = true;
-        // Stash the alarm player so the manager can cut it off if the
+        // Stash the alarm stop function so the manager can cut it off if the
         // player captures (or the event is cancelled) before the clip
         // finishes — otherwise a beep keeps ringing after the event is
         // already resolved.
         unawaited(
-          game.notifyEventAboutToExpire().then((player) {
-            if (player == null) return;
+          game.notifyEventAboutToExpire().then((stopAlarm) {
+            if (stopAlarm == null) return;
             if (active.captured || active.event.isRemoved) {
-              unawaited(player.stop());
+              unawaited(stopAlarm());
             } else {
-              active.alarmPlayer = player;
+              active.alarmStop = stopAlarm;
             }
           }),
         );
@@ -114,6 +115,7 @@ class GameEventManager extends Component {
     );
     _activeEvents.add(active);
     game.world.add(built.event);
+    game.notifyDeskEventStarted();
     unawaited(student.sayEventStarted());
   }
 
@@ -212,7 +214,9 @@ class GameEventManager extends Component {
 
     nearest.captured = true;
     nearest.stopAlarm();
+    _activeEvents.remove(nearest);
     nearest.event.removeFromParent();
+    nearest.mark?.removeFromParent();
     return EventCapture(student: nearest.student, kindId: nearest.kindId);
   }
 
@@ -225,8 +229,7 @@ class GameEventManager extends Component {
 
   int _currentMaxActiveEvents() {
     final difficulty = game.difficulty.value;
-    final ramped =
-        GameConfig.maxActiveEvents + (difficulty - 1).floor();
+    final ramped = GameConfig.maxActiveEvents + (difficulty - 1).floor();
     return ramped.clamp(
       GameConfig.maxActiveEvents,
       GameConfig.maxActiveEventsCeiling,
@@ -265,13 +268,13 @@ class _ActiveGameEvent {
   bool captured = false;
   double elapsed = 0;
   bool warned = false;
-  AudioPlayer? alarmPlayer;
+  StopFunction? alarmStop;
 
   void stopAlarm() {
-    final player = alarmPlayer;
-    alarmPlayer = null;
-    if (player == null) return;
-    unawaited(player.stop());
+    final stop = alarmStop;
+    alarmStop = null;
+    if (stop == null) return;
+    unawaited(stop());
   }
 }
 
