@@ -345,6 +345,13 @@ class ClusterRoom extends PositionComponent {
     final cols = (width / tileWidth).ceil();
     final rows = (height / tileHeight).ceil();
 
+    // Tile dimensions (24) don't divide roomWidth/roomHeight evenly, so
+    // the right/bottom-most column would draw past the room rectangle
+    // and appear as floating slivers outside the walls. Clipping keeps
+    // every tile pixel inside the room.
+    canvas.save();
+    canvas.clipRect(Rect.fromLTWH(0, 0, width, height));
+
     for (int y = 0; y < rows; y++) {
       for (int x = 0; x < cols; x++) {
         final left = x * tileWidth;
@@ -368,6 +375,8 @@ class ClusterRoom extends PositionComponent {
         }
       }
     }
+
+    canvas.restore();
   }
 }
 
