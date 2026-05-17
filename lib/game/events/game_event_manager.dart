@@ -21,6 +21,7 @@ class GameEventManager extends Component {
   void update(double dt) {
     super.update(dt);
 
+    _cancelEventsForStudentsWhoLeftSeats();
     _activeEvents.removeWhere((active) => active.event.isRemoved);
     if (_activeEvents.length >= GameConfig.maxActiveEvents) return;
 
@@ -34,7 +35,20 @@ class GameEventManager extends Component {
   void _triggerRandomEvent() {
     if (game.room.eventSpots.isEmpty) return;
 
-    final spotIndex = _random.nextInt(game.room.eventSpots.length);
+    final eligibleSpotIndices = <int>[];
+    for (int i = 0; i < game.room.eventSpots.length; i++) {
+      final seatIndex = game.room.eventSeatIndices[i];
+      final seatAlreadyHasEvent = _activeEvents.any(
+        (active) => active.seatIndex == seatIndex,
+      );
+      if (!seatAlreadyHasEvent && game.studentAtSeat(seatIndex) != null) {
+        eligibleSpotIndices.add(i);
+      }
+    }
+    if (eligibleSpotIndices.isEmpty) return;
+
+    final spotIndex =
+        eligibleSpotIndices[_random.nextInt(eligibleSpotIndices.length)];
     final spot = game.room.eventSpots[spotIndex];
     final seatIndex = game.room.eventSeatIndices[spotIndex];
     final student = game.studentAtSeat(seatIndex);
@@ -51,9 +65,27 @@ class GameEventManager extends Component {
         _activeEvents.remove(active);
       },
     );
-    active = _ActiveGameEvent(event: event, student: student, mark: mark);
+    active = _ActiveGameEvent(
+      event: event,
+      seatIndex: seatIndex,
+      student: student,
+      mark: mark,
+    );
     _activeEvents.add(active);
     game.world.add(event);
+  }
+
+  void _cancelEventsForStudentsWhoLeftSeats() {
+    for (final active in List<_ActiveGameEvent>.of(_activeEvents)) {
+      final student = active.student;
+      if (student == null ||
+          student.currentSeatIndex != active.seatIndex ||
+          !student.isSeated) {
+        active.event.removeFromParent();
+        active.mark?.removeFromParent();
+        _activeEvents.remove(active);
+      }
+    }
   }
 
   StudentNpc? captureNearest(Vector2 position) {
@@ -87,9 +119,15 @@ class GameEventManager extends Component {
 }
 
 class _ActiveGameEvent {
-  _ActiveGameEvent({required this.event, required this.student, this.mark});
+  _ActiveGameEvent({
+    required this.event,
+    required this.seatIndex,
+    required this.student,
+    this.mark,
+  });
 
   final BottleDropEvent event;
+  final int seatIndex;
   final StudentNpc? student;
   final EventMarkIndicator? mark;
 }

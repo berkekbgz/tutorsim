@@ -4,10 +4,17 @@ import 'student_npc.dart';
 /// Spawns the MVP student roster: one student per login from
 /// the given login list, seated at the first N desks.
 class StudentFactory {
-  StudentFactory(this.room, this.logins);
+  StudentFactory(
+    this.room,
+    this.logins, {
+    required this.releaseSeat,
+    required this.requestSeat,
+  });
 
   final ClusterRoom room;
   final List<String> logins;
+  final void Function(StudentNpc student) releaseSeat;
+  final StudentSeatAssignment? Function(StudentNpc student) requestSeat;
 
   List<StudentNpc> spawnAll() {
     final result = <StudentNpc>[];
@@ -22,6 +29,11 @@ class StudentFactory {
           login: logins[i],
           position: room.seats[i].clone(),
           direction: room.seatDirections[i],
+          currentSeatIndex: i,
+          findPath: room.findPath,
+          randomWalkablePoint: room.randomWalkablePoint,
+          releaseSeat: releaseSeat,
+          requestSeat: requestSeat,
         ),
       );
     }

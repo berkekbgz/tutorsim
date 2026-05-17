@@ -19,6 +19,10 @@ class GameConfig {
 
   // Student
   static const double studentRadius = 16;
+  static const double studentWalkSpeed = 70;
+  static const double studentWanderChancePerSecond = 0.006;
+  static const double studentWanderPauseMin = 1.2;
+  static const double studentWanderPauseMax = 3.0;
 
   // Desk + accessories
   static const int deskCols = 4;
@@ -46,6 +50,7 @@ class GameConfig {
 
   // Camera
   static const double cameraZoom = 1.0;
+  static const double cameraFollowSmoothing = 4.5;
 
   // Palette
   static const Color floorColor = Color(0xFF1B1F2A);

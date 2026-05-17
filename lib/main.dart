@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -23,29 +25,26 @@ class _TutorSimAppState extends State<TutorSimApp> {
   @override
   void initState() {
     super.initState();
-    HardwareKeyboard.instance.addHandler(_onKey);
+    RawKeyboard.instance.addListener(_onKey);
   }
 
   @override
   void dispose() {
-    HardwareKeyboard.instance.removeHandler(_onKey);
+    RawKeyboard.instance.removeListener(_onKey);
     super.dispose();
   }
 
   // We maintain our own held-keys set instead of trusting
-  // HardwareKeyboard.logicalKeysPressed, which is unreliable on Flutter
-  // Web (the set briefly empties around key repeats and focus changes).
-  bool _onKey(KeyEvent event) {
-    if (event is KeyDownEvent) {
+  // logicalKeysPressed, which is unreliable on Flutter Web around key repeats.
+  void _onKey(RawKeyEvent event) {
+    if (event is RawKeyDownEvent) {
       _game?.heldKeys.add(event.logicalKey);
       if (event.logicalKey == LogicalKeyboardKey.space) {
         _game?.captureCurrentEvent();
       }
-    } else if (event is KeyUpEvent) {
+    } else if (event is RawKeyUpEvent) {
       _game?.heldKeys.remove(event.logicalKey);
     }
-    // KeyRepeatEvent: key is already in the set, nothing to do.
-    return false;
   }
 
   @override

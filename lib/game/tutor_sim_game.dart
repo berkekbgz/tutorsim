@@ -1,4 +1,5 @@
-import 'package:flame/experimental.dart';
+import 'dart:math';
+
 import 'package:flame/game.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -41,6 +42,8 @@ class TutorSimGame extends FlameGame {
   final ValueNotifier<String?> tigToast = ValueNotifier<String?>(null);
 
   final List<StudentNpc> _students = [];
+  final List<StudentNpc?> _seatOccupants = [];
+  final Random _random = Random();
   late final TutorPlayer _tutor;
   late final GameEventManager _eventManager;
   final Map<String, int> _tigHoursByLogin = {};
@@ -72,15 +75,13 @@ class TutorSimGame extends FlameGame {
     await world.add(_eventManager);
 
     camera.viewfinder.zoom = GameConfig.cameraZoom;
-    camera.follow(_tutor);
-    camera.setBounds(
-      Rectangle.fromLTWH(0, 0, GameConfig.roomWidth, GameConfig.roomHeight),
-    );
+    camera.viewfinder.position = _tutor.position.clone();
   }
 
   @override
   void update(double dt) {
     super.update(dt);
+    _updateCamera(dt);
 
     // Refresh the debug HUD from the live held-keys set.
     final parts = <String>[];
@@ -125,6 +126,15 @@ class TutorSimGame extends FlameGame {
   bool _held(LogicalKeyboardKey a, LogicalKeyboardKey b) =>
       heldKeys.contains(a) || heldKeys.contains(b);
 
+  void _updateCamera(double dt) {
+    if (size.x <= 0 || size.y <= 0) return;
+
+    final target = _tutor.position;
+    final t = 1 - exp(-GameConfig.cameraFollowSmoothing * dt);
+    final current = camera.viewfinder.position;
+    camera.viewfinder.position = current + (target - current) * t;
+  }
+
   Future<void> setStudentLogins(List<String> logins) async {
     if (logins.isEmpty) return;
     await room.loaded;
@@ -140,15 +150,53 @@ class TutorSimGame extends FlameGame {
   }
 
   StudentNpc? studentAtSeat(int seatIndex) {
-    if (seatIndex < 0 || seatIndex >= _students.length) return null;
-    return _students[seatIndex];
+    if (seatIndex < 0 || seatIndex >= _seatOccupants.length) return null;
+    final student = _seatOccupants[seatIndex];
+    if (student == null || !student.isSeated) return null;
+    return student;
   }
 
   Future<void> _spawnStudents(List<String> logins) async {
-    final students = StudentFactory(room, logins).spawnAll();
+    _seatOccupants
+      ..clear()
+      ..addAll(List<StudentNpc?>.filled(room.seats.length, null));
+    final students = StudentFactory(
+      room,
+      logins,
+      releaseSeat: _releaseSeat,
+      requestSeat: _requestSeat,
+    ).spawnAll();
     _students.addAll(students);
+    for (final student in students) {
+      final seatIndex = student.currentSeatIndex;
+      if (seatIndex != null && seatIndex < _seatOccupants.length) {
+        _seatOccupants[seatIndex] = student;
+      }
+    }
     for (final student in students) {
       await world.add(student);
     }
+  }
+
+  void _releaseSeat(StudentNpc student) {
+    final seatIndex = student.currentSeatIndex;
+    if (seatIndex == null || seatIndex >= _seatOccupants.length) return;
+    if (_seatOccupants[seatIndex] == student) _seatOccupants[seatIndex] = null;
+  }
+
+  StudentSeatAssignment? _requestSeat(StudentNpc student) {
+    final availableSeats = <int>[];
+    for (int i = 0; i < _seatOccupants.length; i++) {
+      if (_seatOccupants[i] == null) availableSeats.add(i);
+    }
+    if (availableSeats.isEmpty) return null;
+
+    final seatIndex = availableSeats[_random.nextInt(availableSeats.length)];
+    _seatOccupants[seatIndex] = student;
+    return StudentSeatAssignment(
+      index: seatIndex,
+      position: room.seats[seatIndex].clone(),
+      direction: room.seatDirections[seatIndex],
+    );
   }
 }
