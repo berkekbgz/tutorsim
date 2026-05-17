@@ -1,4 +1,5 @@
 import 'package:flame/components.dart';
+import 'package:flutter/painting.dart';
 import 'package:flutter/services.dart';
 
 import '../game_config.dart';
@@ -33,6 +34,24 @@ class TutorPlayer extends PositionComponent {
   late final Map<CharacterDirection, SpriteAnimation> _idleAnims;
   late final Map<CharacterDirection, SpriteAnimation> _walkAnims;
   CharacterDirection _facing = CharacterDirection.down;
+
+  static final Paint _shadowPaint = Paint()
+    ..color = const Color(0x77000000)
+    ..filterQuality = FilterQuality.none;
+  static final Paint _bodyPaint = Paint()
+    ..color = const Color(0xFF42D7F5)
+    ..filterQuality = FilterQuality.none;
+  static final Paint _bodyEdgePaint = Paint()
+    ..color = const Color(0xFF07151A)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.5
+    ..filterQuality = FilterQuality.none;
+
+  @override
+  void render(Canvas canvas) {
+    _renderBody(canvas);
+    super.render(canvas);
+  }
 
   @override
   Future<void> onLoad() async {
@@ -123,5 +142,19 @@ class TutorPlayer extends PositionComponent {
       return input.x < 0 ? CharacterDirection.left : CharacterDirection.right;
     }
     return input.y < 0 ? CharacterDirection.up : CharacterDirection.down;
+  }
+
+  void _renderBody(Canvas canvas) {
+    canvas.drawOval(Rect.fromLTWH(6, 23, 20, 8), _shadowPaint);
+
+    final torso = RRect.fromRectAndRadius(
+      Rect.fromLTWH(7, 11, 18, 16),
+      const Radius.circular(3),
+    );
+    canvas.drawRRect(torso, _bodyPaint);
+    canvas.drawRRect(torso, _bodyEdgePaint);
+
+    canvas.drawRect(Rect.fromLTWH(6, 16, 5, 9), _bodyPaint);
+    canvas.drawRect(Rect.fromLTWH(21, 16, 5, 9), _bodyPaint);
   }
 }

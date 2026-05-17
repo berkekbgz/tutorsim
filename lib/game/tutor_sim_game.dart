@@ -31,8 +31,13 @@ class TutorSimGame extends FlameGame {
   // Reactive HUD state. Owned by the game so the Flutter overlay can
   // listen via ValueListenableBuilder.
   final ValueNotifier<int> score = ValueNotifier<int>(GameConfig.startScore);
-  final ValueNotifier<int> reputation = ValueNotifier<int>(
-    GameConfig.startReputation,
+
+  /// The lose-condition meter. Drains by [GameConfig.tigMetreDrainPerSecond]
+  /// every second, drops by [GameConfig.tigMetreLossPerMissedEvent] on a
+  /// missed event, and refills by [GameConfig.tigMetreGainPerCorrectTig]
+  /// on a successful TIG. Reaching zero ends the run.
+  final ValueNotifier<double> tigMetre = ValueNotifier<double>(
+    GameConfig.tigMetreStart.toDouble(),
   );
   final ValueNotifier<double> timeLeft = ValueNotifier<double>(
     GameConfig.shiftSeconds,
@@ -138,6 +143,14 @@ class TutorSimGame extends FlameGame {
       if (timeLeft.value <= 0) _endGame('Shift over');
     }
 
+    // Continuous TIG metre drain, scaled by current difficulty so time
+    // pressure compounds as the run goes on. Missed events deduct in
+    // [notifyMissedEvent]; correct TIGs refill in [captureCurrentEvent].
+    final drained = tigMetre.value -
+        GameConfig.tigMetreDrainPerSecond * difficulty.value * dt;
+    tigMetre.value = drained.clamp(0.0, GameConfig.tigMetreMax.toDouble());
+    if (tigMetre.value <= 0) _endGame('TIG metre drained');
+
     if (_tigToastTimer > 0) {
       _tigToastTimer -= dt;
       if (_tigToastTimer <= 0) tigToast.value = null;
@@ -162,8 +175,8 @@ class TutorSimGame extends FlameGame {
         (_tigHoursByLogin[student.login] ?? 0) + GameConfig.tigHoursPerCapture;
     _tigHoursByLogin[student.login] = hours;
     score.value += GameConfig.scorePerCorrectTig;
-    reputation.value = (reputation.value + GameConfig.reputationPerCorrectTig)
-        .clamp(0, GameConfig.startReputation);
+    tigMetre.value = (tigMetre.value + GameConfig.tigMetreGainPerCorrectTig)
+        .clamp(0.0, GameConfig.tigMetreMax.toDouble());
     correctTigs.value += 1;
     tigToast.value = '${student.login} got $hours-hour TIG';
     _tigToastTimer = 3;
@@ -174,15 +187,15 @@ class TutorSimGame extends FlameGame {
   }
 
   /// Called by the event manager when an event expires without the
-  /// player capturing it. Penalty per design doc.
+  /// player capturing it. Score takes a hit; TIG metre takes a bigger one.
   void notifyMissedEvent(StudentNpc? student) {
     if (gameOver.value) return;
     score.value = (score.value + GameConfig.scorePerMissedEvent)
         .clamp(0, 1 << 30);
-    reputation.value = (reputation.value + GameConfig.reputationPerMissedEvent)
-        .clamp(0, GameConfig.startReputation);
+    tigMetre.value = (tigMetre.value - GameConfig.tigMetreLossPerMissedEvent)
+        .clamp(0.0, GameConfig.tigMetreMax.toDouble());
     missedEvents.value += 1;
-    if (reputation.value <= 0) _endGame('Reputation hit zero');
+    if (tigMetre.value <= 0) _endGame('TIG metre drained');
   }
 
   void _endGame(String reason) {

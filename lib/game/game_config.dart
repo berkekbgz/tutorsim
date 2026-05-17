@@ -11,7 +11,7 @@ class GameConfig {
 
   // Tutor
   static const double tutorRadius = 16;
-  static const double tutorSpeed = 240 * 2;
+  static const double tutorSpeed = 240 * 1.5;
 
   /// Which row of the character atlas to use for the tutor sprite.
   /// Easy to change to taste; valid base rows are 0, 3, 6, 9, 12, and 15.
@@ -49,9 +49,18 @@ class GameConfig {
   static const double eventCaptureRadius = 72;
   static const int tigHoursPerCapture = 2;
   static const int scorePerCorrectTig = 100;
-  static const int reputationPerCorrectTig = 5;
   static const int scorePerMissedEvent = -30;
-  static const int reputationPerMissedEvent = -15;
+
+  // TIG METRE — the lose condition. Drains continuously and on misses,
+  // refills on correct TIGs. Reaching zero ends the run.
+  // The effective drain is `tigMetreDrainPerSecond * difficulty`, so
+  // pressure escalates with the difficulty ramp: ~100s to empty when
+  // idle at game start, ~25s once difficulty plateaus at x4.
+  static const int tigMetreMax = 100;
+  static const int tigMetreStart = 100;
+  static const double tigMetreDrainPerSecond = 1.0;
+  static const double tigMetreGainPerCorrectTig = 12;
+  static const double tigMetreLossPerMissedEvent = 15;
 
   // Difficulty ramp. `difficulty` is a unitless multiplier that scales
   // from [difficultyMin] at game start to [difficultyMax] after
@@ -64,7 +73,6 @@ class GameConfig {
 
   // Shift / HUD initial values
   static const double shiftSeconds = 300; // 5-minute shift
-  static const int startReputation = 100;
   static const int startScore = 0;
 
   // Camera

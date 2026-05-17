@@ -1,5 +1,13 @@
 enum StudentPersonality { regular, chaotic, sneaky, sleepy, loud }
 
+const Map<StudentPersonality, int> studentPersonalityBodyColors = {
+  StudentPersonality.regular: 0xFF7A8EA8,
+  StudentPersonality.chaotic: 0xFFC96F58,
+  StudentPersonality.sneaky: 0xFF7167A8,
+  StudentPersonality.sleepy: 0xFF6FA88F,
+  StudentPersonality.loud: 0xFFC49A4A,
+};
+
 StudentPersonality personalityForLogin(String login) {
   var hash = 0;
   for (final unit in login.codeUnits) {

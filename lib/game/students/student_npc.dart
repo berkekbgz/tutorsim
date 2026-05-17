@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flame/components.dart';
+import 'package:flutter/painting.dart';
 
 import '../game_config.dart';
 import '../name_tag.dart';
@@ -78,6 +79,22 @@ class StudentNpc extends PositionComponent {
         _moveTarget == null &&
         _pauseLeft <= 0 &&
         position.distanceToSquared(seatPosition) < 4;
+  }
+
+  static final Paint _shadowPaint = Paint()
+    ..color = const Color(0x66000000)
+    ..filterQuality = FilterQuality.none;
+  static final Paint _bodyPaint = Paint()..filterQuality = FilterQuality.none;
+  static final Paint _bodyEdgePaint = Paint()
+    ..color = const Color(0xAA111111)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.5
+    ..filterQuality = FilterQuality.none;
+
+  @override
+  void render(Canvas canvas) {
+    _renderBody(canvas);
+    super.render(canvas);
   }
 
   @override
@@ -295,5 +312,22 @@ class StudentNpc extends PositionComponent {
     );
     _bubble = bubble;
     await add(bubble);
+  }
+
+  void _renderBody(Canvas canvas) {
+    final bodyColor = studentPersonalityBodyColors[personality] ?? 0xFF7A8EA8;
+    _bodyPaint.color = Color(bodyColor);
+
+    canvas.drawOval(Rect.fromLTWH(7, 23, 18, 7), _shadowPaint);
+
+    final torso = RRect.fromRectAndRadius(
+      Rect.fromLTWH(8, 12, 16, 15),
+      const Radius.circular(3),
+    );
+    canvas.drawRRect(torso, _bodyPaint);
+    canvas.drawRRect(torso, _bodyEdgePaint);
+
+    canvas.drawRect(Rect.fromLTWH(7, 17, 4, 8), _bodyPaint);
+    canvas.drawRect(Rect.fromLTWH(21, 17, 4, 8), _bodyPaint);
   }
 }

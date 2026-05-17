@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../game_config.dart';
 import '../tutor_sim_game.dart';
 
 /// Flame overlay built from plain Flutter widgets. Listens to the game's
@@ -43,15 +44,6 @@ class HudOverlay extends StatelessWidget {
                             _Stat(label: 'SCORE', value: v.toString()),
                       ),
                       const _Divider(),
-                      ValueListenableBuilder<int>(
-                        valueListenable: game.reputation,
-                        builder: (_, v, _) => _Stat(
-                          label: 'REP',
-                          value: v.toString(),
-                          valueColor: _reputationColor(v),
-                        ),
-                      ),
-                      const _Divider(),
                       ValueListenableBuilder<double>(
                         valueListenable: game.timeLeft,
                         builder: (_, v, _) =>
@@ -73,6 +65,13 @@ class HudOverlay extends StatelessWidget {
                       ),
                     ],
                   ),
+                ),
+              ),
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _TigMetreBar(game: game),
                 ),
               ),
               Align(
@@ -118,12 +117,6 @@ class HudOverlay extends StatelessWidget {
     final mm = (s ~/ 60).toString().padLeft(2, '0');
     final ss = (s % 60).toString().padLeft(2, '0');
     return '$mm:$ss';
-  }
-
-  static Color _reputationColor(int v) {
-    if (v <= 25) return const Color(0xFFFF5C5C);
-    if (v <= 60) return const Color(0xFFFFC03A);
-    return const Color(0xFF8BE28B);
   }
 
   static Color _difficultyColor(double v) {
@@ -178,4 +171,70 @@ class _Divider extends StatelessWidget {
     margin: const EdgeInsets.symmetric(horizontal: 14),
     color: const Color(0xFF2A3142),
   );
+}
+
+/// Bottom-anchored fill bar. Width caps at 520 but shrinks with the
+/// viewport so it always fits a narrow window.
+class _TigMetreBar extends StatelessWidget {
+  const _TigMetreBar({required this.game});
+
+  final TutorSimGame game;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxWidth = MediaQuery.of(context).size.width - 32;
+    final width = maxWidth.clamp(160.0, 520.0);
+    return ValueListenableBuilder<double>(
+      valueListenable: game.tigMetre,
+      builder: (_, value, _) {
+        final fraction = (value / GameConfig.tigMetreMax).clamp(0.0, 1.0);
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'TIG METRE',
+              style: TextStyle(
+                color: Color(0xFFFFFFFF),
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 2.4,
+                shadows: [
+                  Shadow(
+                    blurRadius: 2,
+                    color: Color(0xCC000000),
+                    offset: Offset(0, 1),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+            Container(
+              width: width,
+              height: 22,
+              decoration: BoxDecoration(
+                color: const Color(0xCC0E1219),
+                border: Border.all(color: const Color(0xFF2A3142), width: 2),
+              ),
+              child: ClipRect(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: FractionallySizedBox(
+                    widthFactor: fraction,
+                    heightFactor: 1,
+                    child: ColoredBox(color: _fillColor(fraction)),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  static Color _fillColor(double fraction) {
+    if (fraction <= 0.25) return const Color(0xFFFF5C5C);
+    if (fraction <= 0.6) return const Color(0xFFFFC03A);
+    return const Color(0xFF8BE28B);
+  }
 }
