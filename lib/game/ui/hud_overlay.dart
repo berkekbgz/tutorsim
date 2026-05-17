@@ -58,6 +58,15 @@ class HudOverlay extends StatelessWidget {
                             _Stat(label: 'TIME', value: _formatTime(v)),
                       ),
                       const _Divider(),
+                      ValueListenableBuilder<double>(
+                        valueListenable: game.difficulty,
+                        builder: (_, v, _) => _Stat(
+                          label: 'DIFF',
+                          value: 'x${v.toStringAsFixed(1)}',
+                          valueColor: _difficultyColor(v),
+                        ),
+                      ),
+                      const _Divider(),
                       ValueListenableBuilder<String>(
                         valueListenable: game.inputDebug,
                         builder: (_, v, _) => _Stat(label: 'INPUT', value: v),
@@ -115,6 +124,12 @@ class HudOverlay extends StatelessWidget {
     if (v <= 25) return const Color(0xFFFF5C5C);
     if (v <= 60) return const Color(0xFFFFC03A);
     return const Color(0xFF8BE28B);
+  }
+
+  static Color _difficultyColor(double v) {
+    if (v >= 3) return const Color(0xFFFF5C5C);
+    if (v >= 2) return const Color(0xFFFFC03A);
+    return const Color(0xFFFFFFFF);
   }
 }
 

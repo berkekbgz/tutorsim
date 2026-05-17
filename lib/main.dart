@@ -1,12 +1,11 @@
-// ignore_for_file: deprecated_member_use
-
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'game/tutor_sim_game.dart';
-import 'game/ui/hud_overlay.dart';
 import 'game/ui/auth_overlay.dart';
+import 'game/ui/game_over_overlay.dart';
+import 'game/ui/hud_overlay.dart';
 
 void main() {
   runApp(const TutorSimApp());
@@ -21,30 +20,57 @@ class TutorSimApp extends StatefulWidget {
 
 class _TutorSimAppState extends State<TutorSimApp> {
   TutorSimGame? _game;
+  AuthenticatedGameData? _authData;
 
   @override
   void initState() {
     super.initState();
-    RawKeyboard.instance.addListener(_onKey);
+    HardwareKeyboard.instance.addHandler(_onKey);
   }
 
   @override
   void dispose() {
-    RawKeyboard.instance.removeListener(_onKey);
+    HardwareKeyboard.instance.removeHandler(_onKey);
     super.dispose();
   }
 
-  // We maintain our own held-keys set instead of trusting
-  // logicalKeysPressed, which is unreliable on Flutter Web around key repeats.
-  void _onKey(RawKeyEvent event) {
-    if (event is RawKeyDownEvent) {
+  // Maintain our own held-keys set instead of trusting
+  // HardwareKeyboard.logicalKeysPressed, which is unreliable on Flutter
+  // Web around key repeats and focus changes.
+  bool _onKey(KeyEvent event) {
+    if (event is KeyDownEvent) {
       _game?.heldKeys.add(event.logicalKey);
       if (event.logicalKey == LogicalKeyboardKey.space) {
         _game?.captureCurrentEvent();
       }
-    } else if (event is RawKeyUpEvent) {
+    } else if (event is KeyUpEvent) {
       _game?.heldKeys.remove(event.logicalKey);
     }
+    // KeyRepeatEvent: the key is already in the set, nothing to do.
+    return false;
+  }
+
+  void _startGame(AuthenticatedGameData data) {
+    setState(() {
+      _authData = data;
+      _game = TutorSimGame(
+        tutorLogin: data.user.login,
+        studentLogins: data.studentLogins,
+      );
+    });
+  }
+
+  void _restartGame() {
+    final data = _authData;
+    if (data == null) return;
+    setState(() {
+      // Drop held keys — the user might be mid-press during the restart.
+      _game?.heldKeys.clear();
+      _game = TutorSimGame(
+        tutorLogin: data.user.login,
+        studentLogins: data.studentLogins,
+      );
+    });
   }
 
   @override
@@ -56,22 +82,15 @@ class _TutorSimAppState extends State<TutorSimApp> {
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(useMaterial3: true),
       home: game == null
-          ? LoginPage(
-              onAuthenticated: (data) {
-                setState(() {
-                  _game = TutorSimGame(
-                    tutorLogin: data.user.login,
-                    studentLogins: data.studentLogins,
-                  );
-                });
-              },
-            )
+          ? LoginPage(onAuthenticated: _startGame)
           : Scaffold(
               backgroundColor: const Color(0xFF0B0E14),
               body: GameWidget<TutorSimGame>(
                 game: game,
                 overlayBuilderMap: {
                   'hud': (context, game) => HudOverlay(game: game),
+                  'gameOver': (context, game) =>
+                      GameOverOverlay(game: game, onRestart: _restartGame),
                 },
                 initialActiveOverlays: const ['hud'],
               ),

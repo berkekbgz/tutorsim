@@ -1,23 +1,21 @@
-// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
-
-import 'dart:html' as html;
+import 'package:web/web.dart' as web;
 
 const _stateKey = 'tutorsim_42_oauth_state';
 
-String? readOAuthState() => html.window.localStorage[_stateKey];
+String? readOAuthState() => web.window.localStorage.getItem(_stateKey);
 
 void writeOAuthState(String state) {
-  html.window.localStorage[_stateKey] = state;
+  web.window.localStorage.setItem(_stateKey, state);
 }
 
 void clearOAuthState() {
-  html.window.localStorage.remove(_stateKey);
+  web.window.localStorage.removeItem(_stateKey);
 }
 
 void openOAuthUrl(String url) {
-  html.window.location.assign(url);
+  web.window.location.assign(url);
 }
 
 void replaceBrowserUrl(String url) {
-  html.window.history.replaceState(null, html.document.title, url);
+  web.window.history.replaceState(null, web.document.title, url);
 }

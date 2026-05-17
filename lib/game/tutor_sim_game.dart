@@ -43,6 +43,22 @@ class TutorSimGame extends FlameGame {
   final ValueNotifier<String> inputDebug = ValueNotifier<String>('-');
   final ValueNotifier<String?> tigToast = ValueNotifier<String?>(null);
 
+  /// Time-driven difficulty multiplier. Ramps from
+  /// [GameConfig.difficultyMin] at game start to [GameConfig.difficultyMax]
+  /// after [GameConfig.difficultyRampSeconds], then plateaus. Read by
+  /// [GameEventManager] to scale spawn rate, concurrent cap, and expiry.
+  final ValueNotifier<double> difficulty = ValueNotifier<double>(
+    GameConfig.difficultyMin,
+  );
+
+  /// Flips true the first time a game-over condition is hit. The HUD's
+  /// Flame overlay reacts by mounting the game-over screen.
+  final ValueNotifier<bool> gameOver = ValueNotifier<bool>(false);
+  final ValueNotifier<String?> gameOverReason = ValueNotifier<String?>(null);
+
+  final ValueNotifier<int> correctTigs = ValueNotifier<int>(0);
+  final ValueNotifier<int> missedEvents = ValueNotifier<int>(0);
+
   final List<StudentNpc> _students = [];
   final List<StudentNpc?> _seatOccupants = [];
   final List<String> _studentLoginQueue = [];
@@ -55,6 +71,7 @@ class TutorSimGame extends FlameGame {
   double _tigToastTimer = 0;
   double _nextSpawnIn = GameConfig.studentSpawnIntervalMin;
   bool _spawningStudent = false;
+  double _elapsed = 0;
 
   int get studentSeatCount => room.seats.length;
 
@@ -87,9 +104,15 @@ class TutorSimGame extends FlameGame {
 
   @override
   void update(double dt) {
+    // When the shift is over, freeze the entire world: students stop
+    // moving, events stop spawning, tutor input stops mattering. The
+    // game-over overlay (Flutter widget) keeps rendering on top.
+    if (gameOver.value) return;
     super.update(dt);
     _updateCamera(dt);
     _updatePopulation(dt);
+    _elapsed += dt;
+    difficulty.value = _computeDifficulty(_elapsed);
 
     // Refresh the debug HUD from the live held-keys set.
     final parts = <String>[];
@@ -112,6 +135,7 @@ class TutorSimGame extends FlameGame {
         0.0,
         GameConfig.shiftSeconds,
       );
+      if (timeLeft.value <= 0) _endGame('Shift over');
     }
 
     if (_tigToastTimer > 0) {
@@ -120,13 +144,27 @@ class TutorSimGame extends FlameGame {
     }
   }
 
+  double _computeDifficulty(double elapsedSeconds) {
+    final t = (elapsedSeconds / GameConfig.difficultyRampSeconds).clamp(
+      0.0,
+      1.0,
+    );
+    return GameConfig.difficultyMin +
+        (GameConfig.difficultyMax - GameConfig.difficultyMin) * t;
+  }
+
   void captureCurrentEvent() {
+    if (gameOver.value) return;
     final student = _eventManager.captureNearest(_tutor.position);
     if (student == null) return;
 
     final hours =
         (_tigHoursByLogin[student.login] ?? 0) + GameConfig.tigHoursPerCapture;
     _tigHoursByLogin[student.login] = hours;
+    score.value += GameConfig.scorePerCorrectTig;
+    reputation.value = (reputation.value + GameConfig.reputationPerCorrectTig)
+        .clamp(0, GameConfig.startReputation);
+    correctTigs.value += 1;
     tigToast.value = '${student.login} got $hours-hour TIG';
     _tigToastTimer = 3;
     unawaited(student.sayCaught());
@@ -134,6 +172,27 @@ class TutorSimGame extends FlameGame {
       _sendStudentHome(student, showBubble: false);
     }
   }
+
+  /// Called by the event manager when an event expires without the
+  /// player capturing it. Penalty per design doc.
+  void notifyMissedEvent(StudentNpc? student) {
+    if (gameOver.value) return;
+    score.value = (score.value + GameConfig.scorePerMissedEvent)
+        .clamp(0, 1 << 30);
+    reputation.value = (reputation.value + GameConfig.reputationPerMissedEvent)
+        .clamp(0, GameConfig.startReputation);
+    missedEvents.value += 1;
+    if (reputation.value <= 0) _endGame('Reputation hit zero');
+  }
+
+  void _endGame(String reason) {
+    if (gameOver.value) return;
+    gameOverReason.value = reason;
+    gameOver.value = true;
+    overlays.add('gameOver');
+  }
+
+  Duration get elapsed => Duration(milliseconds: (_elapsed * 1000).round());
 
   bool _held(LogicalKeyboardKey a, LogicalKeyboardKey b) =>
       heldKeys.contains(a) || heldKeys.contains(b);
@@ -144,23 +203,22 @@ class TutorSimGame extends FlameGame {
     final target = _tutor.position;
     final t = 1 - exp(-GameConfig.cameraFollowSmoothing * dt);
     final current = camera.viewfinder.position;
-    camera.viewfinder.position = current + (target - current) * t;
-  }
+    final desired = current + (target - current) * t;
 
-  Future<void> setStudentLogins(List<String> logins) async {
-    if (logins.isEmpty) return;
-    await room.loaded;
-    for (final student in _students) {
-      student.removeFromParent();
-    }
-    _students.clear();
-    _studentStayTimers.clear();
-    _studentLoginQueue.clear();
-    await _spawnStudents(logins);
-  }
+    // Clamp so the viewport doesn't show past the room edges. If the
+    // viewport is bigger than the room on an axis, center that axis.
+    final zoom = camera.viewfinder.zoom;
+    final halfW = size.x / (2 * zoom);
+    final halfH = size.y / (2 * zoom);
+    final minX = halfW;
+    final maxX = GameConfig.roomWidth - halfW;
+    final minY = halfH;
+    final maxY = GameConfig.roomHeight - halfH;
 
-  void setTutorLogin(String login) {
-    _tutor.setLogin(login);
+    camera.viewfinder.position = Vector2(
+      minX <= maxX ? desired.x.clamp(minX, maxX) : GameConfig.roomWidth / 2,
+      minY <= maxY ? desired.y.clamp(minY, maxY) : GameConfig.roomHeight / 2,
+    );
   }
 
   StudentNpc? studentAtSeat(int seatIndex) {
@@ -199,28 +257,30 @@ class TutorSimGame extends FlameGame {
   }
 
   void _updatePopulation(double dt) {
-    final transitionInProgress = _students.any(
-      (student) => student.isLeavingCluster || !student.isSeated,
-    );
+    // Only one student should be physically using the corridor at a time
+    // (to avoid pile-ups at the gate), so we gate "send home" on whether
+    // someone is already leaving. Spawn already has its own _spawningStudent
+    // mutex, so we don't gate it on broader transitions — that previously
+    // starved spawning whenever any student wandered.
+    final hasLeavingStudent = _students.any((s) => s.isLeavingCluster);
 
-    if (!transitionInProgress) {
-      for (final student in List<StudentNpc>.of(_students)) {
-        if (student.hasExitedCluster || !student.isSeated) continue;
-
-        final nextTime =
-            (_studentStayTimers[student] ?? _randomStaySeconds()) - dt;
-        if (nextTime <= 0) {
-          _sendStudentHome(student);
-          break;
-        } else {
-          _studentStayTimers[student] = nextTime;
-        }
+    for (final student in List<StudentNpc>.of(_students)) {
+      if (student.hasExitedCluster ||
+          student.isLeavingCluster ||
+          !student.isSeated) {
+        continue;
+      }
+      final remaining =
+          (_studentStayTimers[student] ?? _randomStaySeconds()) - dt;
+      _studentStayTimers[student] = remaining;
+      if (remaining <= 0 && !hasLeavingStudent) {
+        _sendStudentHome(student);
+        break;
       }
     }
 
     if (_spawningStudent || _studentLoginQueue.isEmpty) return;
     if (_students.length >= _populationTargetCount) return;
-    if (transitionInProgress) return;
 
     _nextSpawnIn -= dt;
     if (_nextSpawnIn > 0) return;

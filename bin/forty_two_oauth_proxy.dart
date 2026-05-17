@@ -137,6 +137,20 @@ Future<void> _proxyMe(HttpRequest request) async {
   }
 }
 
+class _CachedUsers {
+  _CachedUsers(this.logins, this.expiresAt);
+
+  final List<String> logins;
+  final DateTime expiresAt;
+}
+
+const Duration _usersCacheTtl = Duration(minutes: 10);
+final Map<String, _CachedUsers> _usersCache = {};
+
+String _usersCacheKey(String? campusId) {
+  return campusId == null || campusId.isEmpty ? 'all' : campusId;
+}
+
 Future<void> _proxyUsers(HttpRequest request) async {
   final authorization = request.headers.value(HttpHeaders.authorizationHeader);
   if (authorization == null || authorization.isEmpty) {
@@ -152,6 +166,20 @@ Future<void> _proxyUsers(HttpRequest request) async {
   final path = campusId == null || campusId.isEmpty
       ? '/v2/users'
       : '/v2/campus/$campusId/users';
+
+  final cacheKey = _usersCacheKey(campusId);
+  final cached = _usersCache[cacheKey];
+  if (cached != null && cached.expiresAt.isAfter(DateTime.now())) {
+    final shuffled = List<String>.of(cached.logins)..shuffle(Random.secure());
+    stdout.writeln(
+      '  cache hit for $cacheKey (${cached.logins.length} logins, '
+      'expires in ${cached.expiresAt.difference(DateTime.now()).inSeconds}s)',
+    );
+    await _json(request.response, HttpStatus.ok, {
+      'logins': shuffled.take(limit).toList(growable: false),
+    });
+    return;
+  }
 
   final client = HttpClient();
   try {
@@ -202,8 +230,17 @@ Future<void> _proxyUsers(HttpRequest request) async {
       );
     }
 
-    final shuffledLogins = logins.toList(growable: false);
-    shuffledLogins.shuffle(Random.secure());
+    final collected = logins.toList(growable: false);
+    _usersCache[cacheKey] = _CachedUsers(
+      collected,
+      DateTime.now().add(_usersCacheTtl),
+    );
+    stdout.writeln(
+      '  cache miss for $cacheKey: fetched ${collected.length} logins '
+      'from 42 (cached ${_usersCacheTtl.inMinutes}m)',
+    );
+
+    final shuffledLogins = List<String>.of(collected)..shuffle(Random.secure());
     await _json(request.response, HttpStatus.ok, {
       'logins': shuffledLogins.take(limit).toList(growable: false),
     });

@@ -1,4 +1,5 @@
 import 'package:flame/components.dart';
+import 'package:flame/flame.dart';
 import 'package:flutter/painting.dart';
 
 class SpeechBubble extends PositionComponent {
@@ -18,20 +19,20 @@ class SpeechBubble extends PositionComponent {
       super(position: position, anchor: Anchor.bottomCenter, priority: 30);
 
   final TextComponent _text;
+  late final Sprite _bubbleSprite;
   double _lifeLeft = 2.2;
   double _fade = 1;
-
-  static final Paint _fillPaint = Paint()..color = const Color(0xFFF8F4DE);
-  static final Paint _borderPaint = Paint()
-    ..color = const Color(0xFF111111)
-    ..style = PaintingStyle.stroke
-    ..strokeWidth = 2;
+  final Paint _bubblePaint = Paint()..filterQuality = FilterQuality.none;
 
   @override
   Future<void> onLoad() async {
+    _bubbleSprite = Sprite(await Flame.images.load('bubble.png'));
     await add(_text);
-    size = Vector2(_text.width + 14, _text.height + 10);
-    _text.position = Vector2(size.x / 2, size.y / 2 - 1);
+    size = Vector2(
+      (_text.width + 18).clamp(42.0, 96.0),
+      (_text.height + 18).clamp(24.0, 42.0),
+    );
+    _text.position = Vector2(size.x / 2, size.y / 2 - 5);
   }
 
   @override
@@ -47,21 +48,23 @@ class SpeechBubble extends PositionComponent {
   }
 
   @override
-  void render(Canvas canvas) {
+  void renderTree(Canvas canvas) {
+    // Fade the entire subtree (bubble fill + border + text child) by
+    // compositing through a transparency layer. This keeps the text in
+    // sync with the bubble instead of fading only the background.
+    if (_fade >= 1) {
+      super.renderTree(canvas);
+      return;
+    }
     final alpha = (_fade * 255).round().clamp(0, 255);
-    _fillPaint.color = Color.fromARGB(alpha, 248, 244, 222);
-    _borderPaint.color = Color.fromARGB(alpha, 17, 17, 17);
+    final layerPaint = Paint()..color = Color.fromARGB(alpha, 255, 255, 255);
+    canvas.saveLayer(null, layerPaint);
+    super.renderTree(canvas);
+    canvas.restore();
+  }
 
-    final body = Rect.fromLTWH(0, 0, size.x, size.y - 6);
-    canvas.drawRect(body, _fillPaint);
-    canvas.drawRect(body, _borderPaint);
-
-    final tail = Path()
-      ..moveTo(size.x / 2 - 6, size.y - 6)
-      ..lineTo(size.x / 2, size.y)
-      ..lineTo(size.x / 2 + 6, size.y - 6)
-      ..close();
-    canvas.drawPath(tail, _fillPaint);
-    canvas.drawPath(tail, _borderPaint);
+  @override
+  void render(Canvas canvas) {
+    _bubbleSprite.render(canvas, size: size, overridePaint: _bubblePaint);
   }
 }

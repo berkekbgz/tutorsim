@@ -112,12 +112,6 @@ class StudentNpc extends PositionComponent {
     );
   }
 
-  // Kept as a safe no-op so stale hot-reload code cannot crash if it still
-  // calls the old NPC-local event mark API. Event marks now live in world space.
-  Future<void> showEventMark() async {}
-
-  void hideEventMark() {}
-
   Future<void> sayEventStarted() async {
     await _showRandomBubble(personality.eventLines);
   }

@@ -45,8 +45,22 @@ class GameConfig {
   static const double eventIntervalMax = 10;
   static const int maxActiveEvents = 3;
   static const double bottleEventVisibleSeconds = 7;
+  static const double bottleEventVisibleSecondsMin = 2.5;
   static const double eventCaptureRadius = 72;
   static const int tigHoursPerCapture = 2;
+  static const int scorePerCorrectTig = 100;
+  static const int reputationPerCorrectTig = 5;
+  static const int scorePerMissedEvent = -30;
+  static const int reputationPerMissedEvent = -15;
+
+  // Difficulty ramp. `difficulty` is a unitless multiplier that scales
+  // from [difficultyMin] at game start to [difficultyMax] after
+  // [difficultyRampSeconds] of play, then plateaus. It feeds spawn rate,
+  // concurrent event cap, and how long an event stays catchable.
+  static const double difficultyMin = 1.0;
+  static const double difficultyMax = 4.0;
+  static const double difficultyRampSeconds = 300;
+  static const int maxActiveEventsCeiling = 6;
 
   // Shift / HUD initial values
   static const double shiftSeconds = 300; // 5-minute shift

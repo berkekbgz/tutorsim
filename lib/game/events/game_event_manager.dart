@@ -7,9 +7,8 @@ import '../game_config.dart';
 import '../students/student_npc.dart';
 import '../students/student_personality.dart';
 import '../tutor_sim_game.dart';
+import 'event_catalog.dart';
 import 'event_mark_indicator.dart';
-import 'types/bottle_drop_event.dart';
-import 'types/coffee_put_event.dart';
 
 class GameEventManager extends Component {
   GameEventManager(this.game);
@@ -26,7 +25,7 @@ class GameEventManager extends Component {
 
     _cancelEventsForStudentsWhoLeftSeats();
     _activeEvents.removeWhere((active) => active.event.isRemoved);
-    if (_activeEvents.length >= GameConfig.maxActiveEvents) return;
+    if (_activeEvents.length >= _currentMaxActiveEvents()) return;
 
     _nextEventIn -= dt;
     if (_nextEventIn > 0) return;
@@ -71,6 +70,9 @@ class GameEventManager extends Component {
       student: student,
       onExpired: () {
         mark.removeFromParent();
+        // Distinguish "player captured this" from "ran out of time".
+        // captureNearest sets `captured = true` before removing.
+        if (!active.captured) game.notifyMissedEvent(active.student);
         _activeEvents.remove(active);
       },
     );
@@ -91,23 +93,35 @@ class GameEventManager extends Component {
     required void Function() onExpired,
   }) {
     final personality = student.personality;
-    final coffeeWeight = personality.coffeeEventWeight;
-    final bottleWeight = personality.bottleEventWeight;
-    final duration =
+    final difficulty = game.difficulty.value;
+
+    // Visible window shrinks with difficulty (softer ramp than spawn rate
+    // so events don't expire faster than the player can react). Clamped
+    // so it never goes below a humane minimum.
+    final baseVisible =
         GameConfig.bottleEventVisibleSeconds *
         personality.eventDurationMultiplier;
+    final visible = (baseVisible / sqrt(difficulty)).clamp(
+      GameConfig.bottleEventVisibleSecondsMin,
+      GameConfig.bottleEventVisibleSeconds *
+          personality.eventDurationMultiplier,
+    );
 
-    if (_random.nextDouble() * (coffeeWeight + bottleWeight) < coffeeWeight) {
-      return CoffeePutEvent(
-        position: spot.clone(),
-        visibleSeconds: duration,
-        onExpired: onExpired,
-      );
+    final kinds = EventCatalog.all;
+    final weights = [for (final k in kinds) k.weightFor(personality)];
+    final totalWeight = weights.fold<double>(0, (sum, w) => sum + w);
+    var cursor = _random.nextDouble() * totalWeight;
+    StudentEventKind chosen = kinds.last;
+    for (int i = 0; i < kinds.length; i++) {
+      cursor -= weights[i];
+      if (cursor <= 0) {
+        chosen = kinds[i];
+        break;
+      }
     }
-
-    return BottleDropEvent(
+    return chosen.build(
       position: spot.clone(),
-      visibleSeconds: duration,
+      visibleSeconds: visible,
       onExpired: onExpired,
     );
   }
@@ -129,6 +143,10 @@ class GameEventManager extends Component {
       if (student == null ||
           student.currentSeatIndex != active.seatIndex ||
           !student.isSeated) {
+        // Treat as captured so the expiry callback doesn't penalize the
+        // player — the event vanished because the student left, not
+        // because the player ignored it.
+        active.captured = true;
         active.event.removeFromParent();
         active.mark?.removeFromParent();
         _activeEvents.remove(active);
@@ -156,13 +174,26 @@ class GameEventManager extends Component {
       return null;
     }
 
+    nearest.captured = true;
     nearest.event.removeFromParent();
     return nearest.student;
   }
 
   double _randomInterval() {
+    final difficulty = game.difficulty.value;
     final range = GameConfig.eventIntervalMax - GameConfig.eventIntervalMin;
-    return GameConfig.eventIntervalMin + _random.nextDouble() * range;
+    final base = GameConfig.eventIntervalMin + _random.nextDouble() * range;
+    return base / difficulty;
+  }
+
+  int _currentMaxActiveEvents() {
+    final difficulty = game.difficulty.value;
+    final ramped =
+        GameConfig.maxActiveEvents + (difficulty - 1).floor();
+    return ramped.clamp(
+      GameConfig.maxActiveEvents,
+      GameConfig.maxActiveEventsCeiling,
+    );
   }
 }
 
@@ -190,4 +221,5 @@ class _ActiveGameEvent {
   final int seatIndex;
   final StudentNpc? student;
   final EventMarkIndicator? mark;
+  bool captured = false;
 }
