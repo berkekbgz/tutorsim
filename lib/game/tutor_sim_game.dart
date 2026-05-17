@@ -5,6 +5,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../api/score_api.dart';
 import 'game_config.dart';
 import 'events/game_event_manager.dart';
 import 'sprites.dart';
@@ -63,6 +64,13 @@ class TutorSimGame extends FlameGame {
 
   final ValueNotifier<int> correctTigs = ValueNotifier<int>(0);
   final ValueNotifier<int> missedEvents = ValueNotifier<int>(0);
+  final ValueNotifier<List<LeaderboardEntry>> bestScores = ValueNotifier(
+    <LeaderboardEntry>[],
+  );
+  final ValueNotifier<List<SneakyNpcEntry>> sneakyNpcs = ValueNotifier(
+    <SneakyNpcEntry>[],
+  );
+  final ValueNotifier<String?> scoreSyncStatus = ValueNotifier(null);
 
   final List<StudentNpc> _students = [];
   final List<StudentNpc?> _seatOccupants = [];
@@ -71,11 +79,13 @@ class TutorSimGame extends FlameGame {
   late final TutorPlayer _tutor;
   late final GameEventManager _eventManager;
   final Map<String, int> _tigHoursByLogin = {};
+  final Map<String, int> _missedEventsByLogin = {};
   final Map<StudentNpc, double> _studentStayTimers = {};
   int _populationTargetCount = 0;
   double _tigToastTimer = 0;
   double _nextSpawnIn = GameConfig.studentSpawnIntervalMin;
   bool _spawningStudent = false;
+  bool _submittedScore = false;
   double _elapsed = 0;
 
   int get studentSeatCount => room.seats.length;
@@ -146,7 +156,8 @@ class TutorSimGame extends FlameGame {
     // Continuous TIG metre drain, scaled by current difficulty so time
     // pressure compounds as the run goes on. Missed events deduct in
     // [notifyMissedEvent]; correct TIGs refill in [captureCurrentEvent].
-    final drained = tigMetre.value -
+    final drained =
+        tigMetre.value -
         GameConfig.tigMetreDrainPerSecond * difficulty.value * dt;
     tigMetre.value = drained.clamp(0.0, GameConfig.tigMetreMax.toDouble());
     if (tigMetre.value <= 0) _endGame('TIG metre drained');
@@ -190,11 +201,17 @@ class TutorSimGame extends FlameGame {
   /// player capturing it. Score takes a hit; TIG metre takes a bigger one.
   void notifyMissedEvent(StudentNpc? student) {
     if (gameOver.value) return;
-    score.value = (score.value + GameConfig.scorePerMissedEvent)
-        .clamp(0, 1 << 30);
+    score.value = (score.value + GameConfig.scorePerMissedEvent).clamp(
+      0,
+      1 << 30,
+    );
     tigMetre.value = (tigMetre.value - GameConfig.tigMetreLossPerMissedEvent)
         .clamp(0.0, GameConfig.tigMetreMax.toDouble());
     missedEvents.value += 1;
+    if (student != null) {
+      _missedEventsByLogin[student.login] =
+          (_missedEventsByLogin[student.login] ?? 0) + 1;
+    }
     if (tigMetre.value <= 0) _endGame('TIG metre drained');
   }
 
@@ -203,6 +220,36 @@ class TutorSimGame extends FlameGame {
     gameOverReason.value = reason;
     gameOver.value = true;
     overlays.add('gameOver');
+    unawaited(_submitRunResult());
+  }
+
+  Future<void> _submitRunResult() async {
+    if (_submittedScore) return;
+    _submittedScore = true;
+    scoreSyncStatus.value = 'Submitting score...';
+
+    const api = ScoreApi();
+    try {
+      await api.submitScore(
+        login: tutorLogin,
+        score: score.value,
+        correctTigs: correctTigs.value,
+        missedEvents: missedEvents.value,
+        elapsedSeconds: elapsed.inSeconds,
+        peakDifficulty: difficulty.value,
+        missedNpcs: Map<String, int>.of(_missedEventsByLogin),
+      );
+      final results = await Future.wait([
+        api.fetchLeaderboard(limit: 5),
+        api.fetchSneakyNpcs(limit: 5),
+      ]);
+      bestScores.value = results[0] as List<LeaderboardEntry>;
+      sneakyNpcs.value = results[1] as List<SneakyNpcEntry>;
+      scoreSyncStatus.value = null;
+    } catch (error) {
+      scoreSyncStatus.value = 'Score server offline';
+      debugPrint('Score sync failed: $error');
+    }
   }
 
   Duration get elapsed => Duration(milliseconds: (_elapsed * 1000).round());

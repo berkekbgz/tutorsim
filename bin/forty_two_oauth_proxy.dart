@@ -37,6 +37,14 @@ Future<void> main() async {
       } else if (request.method == 'GET' &&
           request.uri.path == '/api/42/users') {
         await _proxyUsers(request);
+      } else if (request.method == 'POST' &&
+          request.uri.path == '/api/scores') {
+        await _submitScore(request);
+      } else if (request.method == 'GET' && request.uri.path == '/api/scores') {
+        await _getScores(request);
+      } else if (request.method == 'GET' &&
+          request.uri.path == '/api/sneaky-npcs') {
+        await _getSneakyNpcs(request);
       } else {
         request.response.statusCode = HttpStatus.notFound;
         request.response.write(jsonEncode({'error': 'not_found'}));
@@ -50,6 +58,148 @@ Future<void> main() async {
       request.response.write(jsonEncode({'error': error.toString()}));
       await request.response.close();
     }
+  }
+}
+
+final File _scoreStoreFile = File(
+  Platform.environment['TUTORSIM_SCORE_FILE'] ?? '.tutorsim_scoreboard.json',
+);
+
+Future<void> _submitScore(HttpRequest request) async {
+  final body = await utf8.decoder.bind(request).join();
+  final json = jsonDecode(body) as Map<String, dynamic>;
+  final store = await _readScoreStore();
+
+  final missedNpcs = <String, int>{};
+  final rawMissedNpcs = json['missed_npcs'];
+  if (rawMissedNpcs is Map) {
+    for (final entry in rawMissedNpcs.entries) {
+      final login = _cleanLogin(entry.key.toString());
+      final count = _asInt(entry.value).clamp(0, 1000000);
+      if (login.isNotEmpty && count > 0) missedNpcs[login] = count;
+    }
+  }
+
+  final record = <String, Object?>{
+    'login': _cleanLogin(json['login']?.toString() ?? 'unknown'),
+    'score': _asInt(json['score']),
+    'correct_tigs': _asInt(json['correct_tigs']),
+    'missed_events': _asInt(json['missed_events']),
+    'elapsed_seconds': _asInt(json['elapsed_seconds']),
+    'peak_difficulty': _asDouble(json['peak_difficulty']),
+    'submitted_at': DateTime.now().toUtc().toIso8601String(),
+  };
+
+  final scores = store.scores..add(record);
+  scores.sort((a, b) => _scoreOf(b).compareTo(_scoreOf(a)));
+  if (scores.length > 100) scores.removeRange(100, scores.length);
+
+  for (final entry in missedNpcs.entries) {
+    store.missedNpcs[entry.key] =
+        (store.missedNpcs[entry.key] ?? 0) + entry.value;
+  }
+
+  await _writeScoreStore(store);
+  await _json(request.response, HttpStatus.ok, {
+    'ok': true,
+    'rank': scores.indexOf(record) + 1,
+  });
+}
+
+Future<void> _getScores(HttpRequest request) async {
+  final limit = int.tryParse(request.uri.queryParameters['limit'] ?? '') ?? 10;
+  final store = await _readScoreStore();
+  final scores = List<Map<String, Object?>>.of(store.scores)
+    ..sort((a, b) => _scoreOf(b).compareTo(_scoreOf(a)));
+  await _json(request.response, HttpStatus.ok, {
+    'scores': scores.take(limit.clamp(1, 50)).toList(growable: false),
+  });
+}
+
+Future<void> _getSneakyNpcs(HttpRequest request) async {
+  final limit = int.tryParse(request.uri.queryParameters['limit'] ?? '') ?? 10;
+  final store = await _readScoreStore();
+  final entries = store.missedNpcs.entries.toList()
+    ..sort((a, b) => b.value.compareTo(a.value));
+  await _json(request.response, HttpStatus.ok, {
+    'npcs': [
+      for (final entry in entries.take(limit.clamp(1, 50)))
+        {'login': entry.key, 'misses': entry.value},
+    ],
+  });
+}
+
+Future<_ScoreStore> _readScoreStore() async {
+  if (!await _scoreStoreFile.exists()) return _ScoreStore.empty();
+
+  try {
+    final json = jsonDecode(await _scoreStoreFile.readAsString());
+    if (json is! Map<String, dynamic>) return _ScoreStore.empty();
+
+    final rawScores = json['scores'];
+    final scores = rawScores is List
+        ? rawScores.whereType<Map>().map((m) {
+            return <String, Object?>{
+              for (final entry in m.entries) entry.key.toString(): entry.value,
+            };
+          }).toList()
+        : <Map<String, Object?>>[];
+
+    final missedNpcs = <String, int>{};
+    final rawMissedNpcs = json['missed_npcs'];
+    if (rawMissedNpcs is Map) {
+      for (final entry in rawMissedNpcs.entries) {
+        missedNpcs[entry.key.toString()] = _asInt(entry.value);
+      }
+    }
+
+    return _ScoreStore(scores: scores, missedNpcs: missedNpcs);
+  } catch (error) {
+    stderr.writeln('Could not read score store: $error');
+    return _ScoreStore.empty();
+  }
+}
+
+Future<void> _writeScoreStore(_ScoreStore store) async {
+  await _scoreStoreFile.writeAsString(
+    const JsonEncoder.withIndent(
+      '  ',
+    ).convert({'scores': store.scores, 'missed_npcs': store.missedNpcs}),
+  );
+}
+
+int _scoreOf(Map<String, Object?> record) => _asInt(record['score']);
+
+int _asInt(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.round();
+  if (value is String) return int.tryParse(value) ?? 0;
+  return 0;
+}
+
+double _asDouble(Object? value) {
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value) ?? 0;
+  return 0;
+}
+
+String _cleanLogin(String value) {
+  return value.trim().replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '').take(32);
+}
+
+class _ScoreStore {
+  const _ScoreStore({required this.scores, required this.missedNpcs});
+
+  factory _ScoreStore.empty() => _ScoreStore(scores: [], missedNpcs: {});
+
+  final List<Map<String, Object?>> scores;
+  final Map<String, int> missedNpcs;
+}
+
+extension _TakeString on String {
+  String take(int count) {
+    if (length <= count) return this;
+    return substring(0, count);
   }
 }
 

@@ -1,0 +1,46 @@
+{
+  "scores": [
+    {
+      "login": "bkabagoz",
+      "score": 3690,
+      "correct_tigs": 39,
+      "missed_events": 7,
+      "elapsed_seconds": 183,
+      "peak_difficulty": 2.8348189999998636,
+      "submitted_at": "2026-05-17T13:47:29.865983Z"
+    },
+    {
+      "login": "bkabagoz",
+      "score": 1080,
+      "correct_tigs": 12,
+      "missed_events": 4,
+      "elapsed_seconds": 85,
+      "peak_difficulty": 1.8506269999999756,
+      "submitted_at": "2026-05-17T11:42:48.142482Z"
+    },
+    {
+      "login": "bkabagoz",
+      "score": 0,
+      "correct_tigs": 1,
+      "missed_events": 5,
+      "elapsed_seconds": 37,
+      "peak_difficulty": 1.374015000000003,
+      "submitted_at": "2026-05-17T13:40:40.524588Z"
+    }
+  ],
+  "missed_npcs": {
+    "mueruslu": 1,
+    "ykosebas": 1,
+    "femullao": 1,
+    "bkabagoz": 1,
+    "raydogmu": 1,
+    "staylan": 1,
+    "tgeler": 1,
+    "mdalkili": 1,
+    "yozlu": 1,
+    "ogudemir": 4,
+    "mdonmeze": 1,
+    "fakartal": 1,
+    "sozgisi": 1
+  }
+}

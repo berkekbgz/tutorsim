@@ -76,11 +76,17 @@ class _TutorSimAppState extends State<TutorSimApp> {
   @override
   Widget build(BuildContext context) {
     final game = _game;
+    final theme = ThemeData.dark(useMaterial3: true);
 
     return MaterialApp(
       title: 'TutorSim',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(useMaterial3: true),
+      theme: theme.copyWith(
+        textTheme: theme.textTheme.apply(fontFamily: 'PressStart2P'),
+        primaryTextTheme: theme.primaryTextTheme.apply(
+          fontFamily: 'PressStart2P',
+        ),
+      ),
       home: game == null
           ? LoginPage(onAuthenticated: _startGame)
           : Scaffold(

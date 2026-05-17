@@ -9,7 +9,8 @@ class NameTag extends PositionComponent {
         textRenderer: TextPaint(
           style: const TextStyle(
             color: Color(0xFFFFFFFF),
-            fontSize: 12,
+            fontFamily: 'PressStart2P',
+            fontSize: 7,
             fontWeight: FontWeight.w700,
             shadows: [
               Shadow(

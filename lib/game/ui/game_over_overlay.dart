@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../api/score_api.dart';
 import '../tutor_sim_game.dart';
 
 class GameOverOverlay extends StatelessWidget {
@@ -29,7 +30,7 @@ class GameOverOverlay extends StatelessWidget {
             ],
           ),
           child: Container(
-            width: 360,
+            width: 520,
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               color: const Color(0xFFE8E1C8),
@@ -78,6 +79,33 @@ class GameOverOverlay extends StatelessWidget {
                   label: 'PEAK DIFF',
                   value: 'x${game.difficulty.value.toStringAsFixed(1)}',
                 ),
+                const SizedBox(height: 18),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: _LeaderboardPanel(game: game)),
+                    const SizedBox(width: 18),
+                    Expanded(child: _SneakyNpcsPanel(game: game)),
+                  ],
+                ),
+                ValueListenableBuilder<String?>(
+                  valueListenable: game.scoreSyncStatus,
+                  builder: (_, status, _) {
+                    if (status == null) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Text(
+                        status,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Color(0xFF7E765D),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    );
+                  },
+                ),
                 const SizedBox(height: 22),
                 _PixelButton(onPressed: onRestart, label: 'TRY AGAIN'),
               ],
@@ -92,6 +120,143 @@ class GameOverOverlay extends StatelessWidget {
     final mm = d.inMinutes.toString().padLeft(2, '0');
     final ss = (d.inSeconds % 60).toString().padLeft(2, '0');
     return '$mm:$ss';
+  }
+}
+
+class _LeaderboardPanel extends StatelessWidget {
+  const _LeaderboardPanel({required this.game});
+
+  final TutorSimGame game;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<List<LeaderboardEntry>>(
+      valueListenable: game.bestScores,
+      builder: (_, entries, _) => _MiniBoard(
+        title: 'BEST SCORES',
+        empty: 'waiting...',
+        rows: [
+          for (int i = 0; i < entries.length; i++)
+            _BoardRow(
+              left: '${i + 1}. ${entries[i].login}',
+              right: entries[i].score.toString(),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SneakyNpcsPanel extends StatelessWidget {
+  const _SneakyNpcsPanel({required this.game});
+
+  final TutorSimGame game;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<List<SneakyNpcEntry>>(
+      valueListenable: game.sneakyNpcs,
+      builder: (_, entries, _) => _MiniBoard(
+        title: 'SNEAKY NPCS',
+        empty: 'no misses yet',
+        rows: [
+          for (int i = 0; i < entries.length; i++)
+            _BoardRow(
+              left: '${i + 1}. ${entries[i].login}',
+              right: 'x${entries[i].misses}',
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniBoard extends StatelessWidget {
+  const _MiniBoard({
+    required this.title,
+    required this.empty,
+    required this.rows,
+  });
+
+  final String title;
+  final String empty;
+  final List<_BoardRow> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFE0D6B9),
+        border: Border.all(color: const Color(0xFF7E765D), width: 2),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                color: Color(0xFF5B584A),
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (rows.isEmpty)
+              Text(
+                empty,
+                style: const TextStyle(
+                  color: Color(0xFF7E765D),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              )
+            else
+              ...rows,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BoardRow extends StatelessWidget {
+  const _BoardRow({required this.left, required this.right});
+
+  final String left;
+  final String right;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              left,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF171717),
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          Text(
+            right,
+            style: const TextStyle(
+              color: Color(0xFF171717),
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
