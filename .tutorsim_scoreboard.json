@@ -20,12 +20,93 @@
     },
     {
       "login": "bkabagoz",
+      "score": 680,
+      "correct_tigs": 8,
+      "missed_events": 4,
+      "elapsed_seconds": 81,
+      "peak_difficulty": 1.8143569999999771,
+      "submitted_at": "2026-05-17T14:56:47.220075Z"
+    },
+    {
+      "login": "bkabagoz",
+      "score": 450,
+      "correct_tigs": 6,
+      "missed_events": 5,
+      "elapsed_seconds": 67,
+      "peak_difficulty": 1.6797239999999867,
+      "submitted_at": "2026-05-17T14:51:34.158912Z"
+    },
+    {
+      "login": "bkabagoz",
+      "score": 250,
+      "correct_tigs": 4,
+      "missed_events": 5,
+      "elapsed_seconds": 58,
+      "peak_difficulty": 1.5880209999999901,
+      "submitted_at": "2026-05-17T15:08:50.124761Z"
+    },
+    {
+      "login": "bkabagoz",
+      "score": 180,
+      "correct_tigs": 3,
+      "missed_events": 5,
+      "elapsed_seconds": 51,
+      "peak_difficulty": 1.5178029999999936,
+      "submitted_at": "2026-05-17T15:14:17.632261Z"
+    },
+    {
+      "login": "bkabagoz",
+      "score": 80,
+      "correct_tigs": 2,
+      "missed_events": 4,
+      "elapsed_seconds": 45,
+      "peak_difficulty": 1.4507189999999972,
+      "submitted_at": "2026-05-17T15:00:15.961526Z"
+    },
+    {
+      "login": "bkabagoz",
+      "score": 80,
+      "correct_tigs": 2,
+      "missed_events": 4,
+      "elapsed_seconds": 46,
+      "peak_difficulty": 1.4667039999999967,
+      "submitted_at": "2026-05-17T15:11:21.482395Z"
+    },
+    {
+      "login": "bkabagoz",
+      "score": 50,
+      "correct_tigs": 2,
+      "missed_events": 5,
+      "elapsed_seconds": 43,
+      "peak_difficulty": 1.4320449999999978,
+      "submitted_at": "2026-05-17T15:03:17.821467Z"
+    },
+    {
+      "login": "bkabagoz",
       "score": 0,
       "correct_tigs": 1,
       "missed_events": 5,
       "elapsed_seconds": 37,
       "peak_difficulty": 1.374015000000003,
       "submitted_at": "2026-05-17T13:40:40.524588Z"
+    },
+    {
+      "login": "bkabagoz",
+      "score": 0,
+      "correct_tigs": 0,
+      "missed_events": 4,
+      "elapsed_seconds": 35,
+      "peak_difficulty": 1.3549980000000021,
+      "submitted_at": "2026-05-17T14:57:24.831645Z"
+    },
+    {
+      "login": "bkabagoz",
+      "score": 0,
+      "correct_tigs": 0,
+      "missed_events": 4,
+      "elapsed_seconds": 34,
+      "peak_difficulty": 1.3416630000000018,
+      "submitted_at": "2026-05-17T14:58:00.945581Z"
     }
   ],
   "missed_npcs": {
@@ -33,14 +114,42 @@
     "ykosebas": 1,
     "femullao": 1,
     "bkabagoz": 1,
-    "raydogmu": 1,
+    "raydogmu": 3,
     "staylan": 1,
     "tgeler": 1,
     "mdalkili": 1,
     "yozlu": 1,
     "ogudemir": 4,
-    "mdonmeze": 1,
+    "mdonmeze": 3,
     "fakartal": 1,
-    "sozgisi": 1
+    "sozgisi": 1,
+    "azkaraka": 2,
+    "bigungor": 1,
+    "kyildiri": 1,
+    "auzundag": 1,
+    "usogukpi": 1,
+    "emigundo": 3,
+    "myigiter": 2,
+    "taalkasa": 1,
+    "yussen": 1,
+    "bdalmaz": 1,
+    "aergun": 2,
+    "emkir": 2,
+    "egeaydin": 1,
+    "aymayuk": 2,
+    "hhaciogl": 1,
+    "ahmetserdar": 2,
+    "ecakdemi": 1,
+    "yesoytur": 1,
+    "ktoraman": 1,
+    "yzeybek": 1,
+    "bakarabu": 1,
+    "elikavak": 1,
+    "musisman": 1,
+    "tuaydin": 1,
+    "gbodur": 1,
+    "hergul": 1,
+    "hdere": 1,
+    "sekuz": 1
   }
 }

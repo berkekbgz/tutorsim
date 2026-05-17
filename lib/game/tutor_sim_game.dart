@@ -72,6 +72,12 @@ class TutorSimGame extends FlameGame {
   );
   final ValueNotifier<String?> scoreSyncStatus = ValueNotifier(null);
 
+  /// Counter incremented every time a flash is requested. Read with
+  /// [lastFlash] for the actual color/peak alpha. Using a counter lets
+  /// the listener fire even for repeated identical flashes.
+  final ValueNotifier<int> flashTick = ValueNotifier<int>(0);
+  FlashSignal? lastFlash;
+
   final List<StudentNpc> _students = [];
   final List<StudentNpc?> _seatOccupants = [];
   final List<String> _studentLoginQueue = [];
@@ -87,6 +93,9 @@ class TutorSimGame extends FlameGame {
   bool _spawningStudent = false;
   bool _submittedScore = false;
   double _elapsed = 0;
+  double _shakeMagnitude = 0;
+  double _shakeTimeLeft = 0;
+  double _shakeTotalTime = 0;
 
   int get studentSeatCount => room.seats.length;
 
@@ -191,6 +200,10 @@ class TutorSimGame extends FlameGame {
     correctTigs.value += 1;
     tigToast.value = '${student.login} got $hours-hour TIG';
     _tigToastTimer = 3;
+    // No screen flash on capture — feedback comes from the toast,
+    // the TIG metre filling, and the score ticking up. The red miss
+    // vignette is the only screen-tinting effect, which keeps it
+    // unambiguous: tinted screen = bad.
     unawaited(student.sayCaught());
     if (_random.nextDouble() < student.personality.quitAfterTigChance) {
       _sendStudentHome(student, showBubble: false);
@@ -212,7 +225,31 @@ class TutorSimGame extends FlameGame {
       _missedEventsByLogin[student.login] =
           (_missedEventsByLogin[student.login] ?? 0) + 1;
     }
+    _triggerFlash(const FlashSignal(
+      color: Color(0xFFFF3344),
+      peakAlpha: 0.7,
+      durationMs: 420,
+      shape: FlashShape.vignette,
+    ));
+    _triggerShake(magnitude: 13, seconds: 0.32);
     if (tigMetre.value <= 0) _endGame('TIG metre drained');
+  }
+
+  void _triggerFlash(FlashSignal signal) {
+    lastFlash = signal;
+    flashTick.value = flashTick.value + 1;
+  }
+
+  void _triggerShake({required double magnitude, required double seconds}) {
+    // If a shake is already running, only escalate — never weaken it.
+    final remainingMag =
+        _shakeTotalTime > 0
+            ? _shakeMagnitude * (_shakeTimeLeft / _shakeTotalTime).clamp(0.0, 1.0)
+            : 0.0;
+    if (magnitude < remainingMag) return;
+    _shakeMagnitude = magnitude;
+    _shakeTimeLeft = seconds;
+    _shakeTotalTime = seconds;
   }
 
   void _endGame(String reason) {
@@ -275,10 +312,27 @@ class TutorSimGame extends FlameGame {
     final minY = halfH;
     final maxY = GameConfig.roomHeight - halfH;
 
-    camera.viewfinder.position = Vector2(
+    final clamped = Vector2(
       minX <= maxX ? desired.x.clamp(minX, maxX) : GameConfig.roomWidth / 2,
       minY <= maxY ? desired.y.clamp(minY, maxY) : GameConfig.roomHeight / 2,
     );
+
+    // Screen shake: decays linearly over its duration. Random direction
+    // each frame so it reads as an impact, not a slide. Applied AFTER
+    // clamping so the shake reads even against a wall.
+    if (_shakeTimeLeft > 0 && _shakeTotalTime > 0) {
+      _shakeTimeLeft = (_shakeTimeLeft - dt).clamp(0.0, _shakeTotalTime);
+      final remaining = (_shakeTimeLeft / _shakeTotalTime).clamp(0.0, 1.0);
+      final mag = _shakeMagnitude * remaining;
+      final angle = _random.nextDouble() * 2 * pi;
+      clamped.add(Vector2(cos(angle) * mag, sin(angle) * mag));
+      if (_shakeTimeLeft <= 0) {
+        _shakeMagnitude = 0;
+        _shakeTotalTime = 0;
+      }
+    }
+
+    camera.viewfinder.position = clamped;
   }
 
   StudentNpc? studentAtSeat(int seatIndex) {
@@ -431,4 +485,36 @@ class TutorSimGame extends FlameGame {
       direction: room.seatDirections[seatIndex],
     );
   }
+}
+
+/// Shape of a screen-flash effect.
+///
+/// - [uniform]: flat full-screen tint.
+/// - [vignette]: transparent center → tint at the edges. Reads as
+///   "damage closing in from the periphery." Used for misses.
+/// - [burst]: tint at the center → transparent at the edges. Reads as
+///   "energy releasing outward." Used for successful captures, so the
+///   visual is the literal inverse of a miss.
+enum FlashShape { uniform, vignette, burst }
+
+/// Parameters for a single screen-flash effect. Read from [TutorSimGame]
+/// by the HUD's `_FlashOverlay` whenever `flashTick` changes.
+class FlashSignal {
+  const FlashSignal({
+    required this.color,
+    this.peakAlpha = 0.45,
+    this.durationMs = 250,
+    this.shape = FlashShape.uniform,
+    this.vignetteInnerStop = 0.4,
+  });
+
+  final Color color;
+  final double peakAlpha;
+  final int durationMs;
+  final FlashShape shape;
+
+  /// For [FlashShape.vignette]: radial-gradient stop where the tint
+  /// starts. Higher = thinner ring of colour at the edges. Ignored for
+  /// other shapes.
+  final double vignetteInnerStop;
 }
