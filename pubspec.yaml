@@ -10,6 +10,8 @@ dependencies:
   flutter:
     sdk: flutter
   flame: ^1.18.0
+  flame_audio: ^2.10.5
+  audioplayers: ^6.6.0
   http: ^1.2.2
   web: ^1.0.0
 
@@ -22,6 +24,11 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    - assets/Exploring The Unknown/
+    - assets/Bump.wav
+    - assets/Boss hit 1.wav
+    - assets/Digital_Alarm.wav
+    - assets/Water_Splash.wav
   fonts:
     - family: PressStart2P
       fonts:

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../students/student_personality.dart';
 import 'types/bottle_drop_event.dart';
 import 'types/coffee_put_event.dart';
+import 'types/sleeping_event.dart';
 
 /// Signature every event type's constructor wrapper must satisfy.
 typedef EventBuilder =
@@ -58,6 +59,20 @@ class EventCatalog {
             required double visibleSeconds,
             required VoidCallback onExpired,
           }) => CoffeePutEvent(
+            position: position,
+            visibleSeconds: visibleSeconds,
+            onExpired: onExpired,
+          ),
+    ),
+    StudentEventKind(
+      id: 'sleep',
+      weightFor: (p) => p.sleepEventWeight,
+      build:
+          ({
+            required Vector2 position,
+            required double visibleSeconds,
+            required VoidCallback onExpired,
+          }) => SleepingEvent(
             position: position,
             visibleSeconds: visibleSeconds,
             onExpired: onExpired,

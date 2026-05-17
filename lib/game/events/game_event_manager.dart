@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flame/components.dart';
 
 import '../game_config.dart';
@@ -25,6 +26,33 @@ class GameEventManager extends Component {
 
     _cancelEventsForStudentsWhoLeftSeats();
     _activeEvents.removeWhere((active) => active.event.isRemoved);
+
+    // Fire the about-to-expire alarm once per event, ~1.5s before it would
+    // miss. Tracked here (rather than inside each event class) so all event
+    // types share the same warning behavior.
+    for (final active in _activeEvents) {
+      active.elapsed += dt;
+      if (!active.warned &&
+          active.elapsed >=
+              active.visibleSeconds - GameConfig.eventExpiryWarningLeadSeconds) {
+        active.warned = true;
+        // Stash the alarm player so the manager can cut it off if the
+        // player captures (or the event is cancelled) before the clip
+        // finishes — otherwise a beep keeps ringing after the event is
+        // already resolved.
+        unawaited(
+          game.notifyEventAboutToExpire().then((player) {
+            if (player == null) return;
+            if (active.captured || active.event.isRemoved) {
+              unawaited(player.stop());
+            } else {
+              active.alarmPlayer = player;
+            }
+          }),
+        );
+      }
+    }
+
     if (_activeEvents.length >= _currentMaxActiveEvents()) return;
 
     _nextEventIn -= dt;
@@ -65,7 +93,7 @@ class GameEventManager extends Component {
     game.world.add(mark);
 
     late final _ActiveGameEvent active;
-    final event = _buildRandomEvent(
+    final built = _buildRandomEvent(
       spot,
       student: student,
       onExpired: () {
@@ -77,17 +105,19 @@ class GameEventManager extends Component {
       },
     );
     active = _ActiveGameEvent(
-      event: event,
+      event: built.event,
+      kindId: built.kindId,
+      visibleSeconds: built.visibleSeconds,
       seatIndex: seatIndex,
       student: student,
       mark: mark,
     );
     _activeEvents.add(active);
-    game.world.add(event);
+    game.world.add(built.event);
     unawaited(student.sayEventStarted());
   }
 
-  PositionComponent _buildRandomEvent(
+  _BuiltEvent _buildRandomEvent(
     Vector2 spot, {
     required StudentNpc student,
     required void Function() onExpired,
@@ -119,10 +149,15 @@ class GameEventManager extends Component {
         break;
       }
     }
-    return chosen.build(
+    final event = chosen.build(
       position: spot.clone(),
       visibleSeconds: visible,
       onExpired: onExpired,
+    );
+    return _BuiltEvent(
+      event: event,
+      kindId: chosen.id,
+      visibleSeconds: visible,
     );
   }
 
@@ -147,6 +182,7 @@ class GameEventManager extends Component {
         // player — the event vanished because the student left, not
         // because the player ignored it.
         active.captured = true;
+        active.stopAlarm();
         active.event.removeFromParent();
         active.mark?.removeFromParent();
         _activeEvents.remove(active);
@@ -154,7 +190,7 @@ class GameEventManager extends Component {
     }
   }
 
-  StudentNpc? captureNearest(Vector2 position) {
+  EventCapture? captureNearest(Vector2 position) {
     _activeEvents.removeWhere((active) => active.event.isRemoved);
     if (_activeEvents.isEmpty) return null;
 
@@ -175,8 +211,9 @@ class GameEventManager extends Component {
     }
 
     nearest.captured = true;
+    nearest.stopAlarm();
     nearest.event.removeFromParent();
-    return nearest.student;
+    return EventCapture(student: nearest.student, kindId: nearest.kindId);
   }
 
   double _randomInterval() {
@@ -212,14 +249,47 @@ class _EligibleEventSpot {
 class _ActiveGameEvent {
   _ActiveGameEvent({
     required this.event,
+    required this.kindId,
+    required this.visibleSeconds,
     required this.seatIndex,
     required this.student,
     this.mark,
   });
 
   final PositionComponent event;
+  final String kindId;
+  final double visibleSeconds;
   final int seatIndex;
   final StudentNpc? student;
   final EventMarkIndicator? mark;
   bool captured = false;
+  double elapsed = 0;
+  bool warned = false;
+  AudioPlayer? alarmPlayer;
+
+  void stopAlarm() {
+    final player = alarmPlayer;
+    alarmPlayer = null;
+    if (player == null) return;
+    unawaited(player.stop());
+  }
+}
+
+class _BuiltEvent {
+  const _BuiltEvent({
+    required this.event,
+    required this.kindId,
+    required this.visibleSeconds,
+  });
+
+  final PositionComponent event;
+  final String kindId;
+  final double visibleSeconds;
+}
+
+class EventCapture {
+  const EventCapture({required this.student, required this.kindId});
+
+  final StudentNpc? student;
+  final String kindId;
 }

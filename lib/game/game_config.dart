@@ -46,6 +46,7 @@ class GameConfig {
   static const int maxActiveEvents = 3;
   static const double bottleEventVisibleSeconds = 7;
   static const double bottleEventVisibleSecondsMin = 2.5;
+  static const double eventExpiryWarningLeadSeconds = 1.5;
   static const double eventCaptureRadius = 72;
   static const int tigHoursPerCapture = 2;
   static const int scorePerCorrectTig = 100;

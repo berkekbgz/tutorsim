@@ -69,6 +69,16 @@ extension StudentPersonalityTuning on StudentPersonality {
     };
   }
 
+  double get sleepEventWeight {
+    return switch (this) {
+      StudentPersonality.regular => 0.6,
+      StudentPersonality.chaotic => 0.35,
+      StudentPersonality.sneaky => 0.7,
+      StudentPersonality.sleepy => 2.6,
+      StudentPersonality.loud => 0.3,
+    };
+  }
+
   double get quitAfterTigChance {
     return switch (this) {
       StudentPersonality.regular => 0.05,

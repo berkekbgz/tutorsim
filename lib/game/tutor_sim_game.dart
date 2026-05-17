@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flame_audio/flame_audio.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -21,6 +22,24 @@ class TutorSimGame extends FlameGame {
 
   final String tutorLogin;
   final List<String> initialStudentLogins;
+
+  static const _musicIntro =
+      'Exploring The Unknown/xDeviruchi - Exploring The Unknown (Intro).wav';
+  static const _musicLoop =
+      'Exploring The Unknown/xDeviruchi - Exploring The Unknown (Loop).wav';
+  static const _musicEnd =
+      'Exploring The Unknown/xDeviruchi - Exploring The Unknown (End).wav';
+  static const _musicVolume = 0.45;
+
+  // Short SFX. Filenames are relative to the FlameAudio prefix
+  // (`assets/`), which is set in `_startBackgroundMusic`.
+  static const _sfxBump = 'Bump.wav';
+  static const _sfxBossHit = 'Boss hit 1.wav';
+  static const _sfxAlarm = 'Digital_Alarm.wav';
+  static const _sfxSplash = 'Water_Splash.wav';
+  // Digital_Alarm.wav is ~2.5s; clip the tail so only the opening beep
+  // plays as a warning, per the spec.
+  static const _alarmHalfMs = 800;
 
   late final ClusterRoom room;
 
@@ -92,6 +111,10 @@ class TutorSimGame extends FlameGame {
   double _nextSpawnIn = GameConfig.studentSpawnIntervalMin;
   bool _spawningStudent = false;
   bool _submittedScore = false;
+  bool _musicStarted = false;
+  bool _endingMusic = false;
+  AudioPlayer? _introPlayer;
+  AudioPlayer? _endPlayer;
   double _elapsed = 0;
   double _shakeMagnitude = 0;
   double _shakeTimeLeft = 0;
@@ -124,6 +147,16 @@ class TutorSimGame extends FlameGame {
 
     camera.viewfinder.zoom = GameConfig.cameraZoom;
     camera.viewfinder.position = _tutor.position.clone();
+
+    await _startBackgroundMusic();
+  }
+
+  @override
+  void onRemove() {
+    unawaited(FlameAudio.bgm.stop());
+    unawaited(_introPlayer?.dispose() ?? Future<void>.value());
+    unawaited(_endPlayer?.dispose() ?? Future<void>.value());
+    super.onRemove();
   }
 
   @override
@@ -188,7 +221,9 @@ class TutorSimGame extends FlameGame {
 
   void captureCurrentEvent() {
     if (gameOver.value) return;
-    final student = _eventManager.captureNearest(_tutor.position);
+    final capture = _eventManager.captureNearest(_tutor.position);
+    if (capture == null) return;
+    final student = capture.student;
     if (student == null) return;
 
     final hours =
@@ -204,10 +239,95 @@ class TutorSimGame extends FlameGame {
     // the TIG metre filling, and the score ticking up. The red miss
     // vignette is the only screen-tinting effect, which keeps it
     // unambiguous: tinted screen = bad.
+    // Capture SFX is event-specific: sleep gets the splash (a "snap out
+    // of it" cue), everything else gets the generic bump.
+    final captureSfx = capture.kindId == 'sleep' ? _sfxSplash : _sfxBump;
+    unawaited(_playSfx(captureSfx, volume: 0.7));
     unawaited(student.sayCaught());
     if (_random.nextDouble() < student.personality.quitAfterTigChance) {
       _sendStudentHome(student, showBubble: false);
     }
+  }
+
+  Future<void> _startBackgroundMusic() async {
+    if (_musicStarted) return;
+    _musicStarted = true;
+    FlameAudio.updatePrefix('assets/');
+    await FlameAudio.bgm.initialize();
+    // Preload SFX so the first hit/capture/miss doesn't stutter while
+    // audioplayers decodes the file on the audio thread.
+    unawaited(
+      FlameAudio.audioCache.loadAll([
+        _sfxBump,
+        _sfxBossHit,
+        _sfxAlarm,
+        _sfxSplash,
+      ]),
+    );
+    _introPlayer = await FlameAudio.playLongAudio(
+      _musicIntro,
+      volume: _musicVolume,
+    );
+    unawaited(_startLoopAfterIntro(_introPlayer!));
+  }
+
+  Future<void> _playSfx(String filename, {double volume = 0.7}) async {
+    if (gameOver.value && filename != _sfxBossHit) return;
+    try {
+      await FlameAudio.play(filename, volume: volume);
+    } catch (error) {
+      debugPrint('SFX $filename failed: $error');
+    }
+  }
+
+  Future<AudioPlayer?> _playSfxClipped(
+    String filename, {
+    required int clipMs,
+    double volume = 0.7,
+  }) async {
+    if (gameOver.value) return null;
+    try {
+      final player = await FlameAudio.play(filename, volume: volume);
+      Future.delayed(Duration(milliseconds: clipMs), () {
+        unawaited(player.stop());
+      });
+      return player;
+    } catch (error) {
+      debugPrint('SFX $filename failed: $error');
+      return null;
+    }
+  }
+
+  /// Called by [GameEventManager] when an active event is about to
+  /// expire. Plays only the leading beep of the alarm so it reads as
+  /// "hurry" rather than a full alert siren. The caller gets back the
+  /// [AudioPlayer] so it can [AudioPlayer.stop] it early if the player
+  /// captures the event before the clip naturally ends.
+  Future<AudioPlayer?> notifyEventAboutToExpire() {
+    if (gameOver.value) return Future.value(null);
+    return _playSfxClipped(_sfxAlarm, clipMs: _alarmHalfMs, volume: 0.55);
+  }
+
+  Future<void> _startLoopAfterIntro(AudioPlayer introPlayer) async {
+    await introPlayer.onPlayerComplete.first;
+    if (_introPlayer == introPlayer) _introPlayer = null;
+    await introPlayer.dispose();
+    if (_endingMusic || gameOver.value || isRemoved) return;
+    await FlameAudio.bgm.play(_musicLoop, volume: _musicVolume);
+  }
+
+  Future<void> _playEndMusic() async {
+    if (_endingMusic) return;
+    _endingMusic = true;
+    await FlameAudio.bgm.stop();
+    final introPlayer = _introPlayer;
+    _introPlayer = null;
+    await introPlayer?.dispose();
+    await _endPlayer?.dispose();
+    _endPlayer = await FlameAudio.playLongAudio(
+      _musicEnd,
+      volume: _musicVolume,
+    );
   }
 
   /// Called by the event manager when an event expires without the
@@ -225,13 +345,16 @@ class TutorSimGame extends FlameGame {
       _missedEventsByLogin[student.login] =
           (_missedEventsByLogin[student.login] ?? 0) + 1;
     }
-    _triggerFlash(const FlashSignal(
-      color: Color(0xFFFF3344),
-      peakAlpha: 0.7,
-      durationMs: 420,
-      shape: FlashShape.vignette,
-    ));
+    _triggerFlash(
+      const FlashSignal(
+        color: Color(0xFFFF3344),
+        peakAlpha: 0.7,
+        durationMs: 420,
+        shape: FlashShape.vignette,
+      ),
+    );
     _triggerShake(magnitude: 13, seconds: 0.32);
+    unawaited(_playSfx(_sfxBossHit, volume: 0.85));
     if (tigMetre.value <= 0) _endGame('TIG metre drained');
   }
 
@@ -242,10 +365,9 @@ class TutorSimGame extends FlameGame {
 
   void _triggerShake({required double magnitude, required double seconds}) {
     // If a shake is already running, only escalate — never weaken it.
-    final remainingMag =
-        _shakeTotalTime > 0
-            ? _shakeMagnitude * (_shakeTimeLeft / _shakeTotalTime).clamp(0.0, 1.0)
-            : 0.0;
+    final remainingMag = _shakeTotalTime > 0
+        ? _shakeMagnitude * (_shakeTimeLeft / _shakeTotalTime).clamp(0.0, 1.0)
+        : 0.0;
     if (magnitude < remainingMag) return;
     _shakeMagnitude = magnitude;
     _shakeTimeLeft = seconds;
@@ -257,6 +379,7 @@ class TutorSimGame extends FlameGame {
     gameOverReason.value = reason;
     gameOver.value = true;
     overlays.add('gameOver');
+    unawaited(_playEndMusic());
     unawaited(_submitRunResult());
   }
 

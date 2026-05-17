@@ -11,12 +11,57 @@
     },
     {
       "login": "bkabagoz",
+      "score": 3430,
+      "correct_tigs": 37,
+      "missed_events": 9,
+      "elapsed_seconds": 187,
+      "peak_difficulty": 2.8750699999999116,
+      "submitted_at": "2026-05-17T16:31:21.798239Z"
+    },
+    {
+      "login": "bkabagoz",
+      "score": 2730,
+      "correct_tigs": 30,
+      "missed_events": 9,
+      "elapsed_seconds": 158,
+      "peak_difficulty": 2.581664999999912,
+      "submitted_at": "2026-05-17T16:22:03.017577Z"
+    },
+    {
+      "login": "bkabagoz",
+      "score": 2260,
+      "correct_tigs": 25,
+      "missed_events": 8,
+      "elapsed_seconds": 152,
+      "peak_difficulty": 2.5217649999999265,
+      "submitted_at": "2026-05-17T15:46:36.532571Z"
+    },
+    {
+      "login": "bkabagoz",
+      "score": 1190,
+      "correct_tigs": 14,
+      "missed_events": 7,
+      "elapsed_seconds": 108,
+      "peak_difficulty": 2.088816339999968,
+      "submitted_at": "2026-05-17T15:53:19.563643Z"
+    },
+    {
+      "login": "bkabagoz",
       "score": 1080,
       "correct_tigs": 12,
       "missed_events": 4,
       "elapsed_seconds": 85,
       "peak_difficulty": 1.8506269999999756,
       "submitted_at": "2026-05-17T11:42:48.142482Z"
+    },
+    {
+      "login": "bkabagoz",
+      "score": 780,
+      "correct_tigs": 9,
+      "missed_events": 5,
+      "elapsed_seconds": 82,
+      "peak_difficulty": 1.823777999999989,
+      "submitted_at": "2026-05-17T15:18:23.995763Z"
     },
     {
       "login": "bkabagoz",
@@ -146,10 +191,35 @@
     "bakarabu": 1,
     "elikavak": 1,
     "musisman": 1,
-    "tuaydin": 1,
+    "tuaydin": 2,
     "gbodur": 1,
-    "hergul": 1,
+    "hergul": 2,
     "hdere": 1,
-    "sekuz": 1
+    "sekuz": 1,
+    "yagunduz": 1,
+    "milenas": 1,
+    "mesalman": 1,
+    "ssarican": 1,
+    "udemirci": 2,
+    "agurses": 1,
+    "aunverdi": 1,
+    "odindar": 1,
+    "amert": 1,
+    "takyol": 1,
+    "abturan": 1,
+    "sercitci": 1,
+    "iakovali": 1,
+    "kugurlu": 1,
+    "haydinog": 1,
+    "kuzyilma": 1,
+    "ahgultep": 1,
+    "oonal": 2,
+    "alkoc": 8,
+    "austunso": 1,
+    "keak": 1,
+    "iarslan": 2,
+    "fguryel": 2,
+    "mukaraar": 1,
+    "ekamar": 1
   }
 }
