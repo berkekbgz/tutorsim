@@ -6,17 +6,21 @@ import '../../game_config.dart';
 import '../../sprites.dart';
 
 class BottleDropEvent extends SpriteAnimationComponent {
-  BottleDropEvent({required Vector2 position, this.onExpired})
-    : super(
-        position: position,
-        size: Vector2.all(24),
-        anchor: Anchor.center,
-        priority: 9,
-        paint: CharacterSprites.pixelPaint(),
-      );
+  BottleDropEvent({
+    required Vector2 position,
+    this.onExpired,
+    double? visibleSeconds,
+  }) : _lifeLeft = visibleSeconds ?? GameConfig.bottleEventVisibleSeconds,
+       super(
+         position: position,
+         size: Vector2.all(24),
+         anchor: Anchor.center,
+         priority: 9,
+         paint: CharacterSprites.pixelPaint(),
+       );
 
   final VoidCallback? onExpired;
-  double _lifeLeft = GameConfig.bottleEventVisibleSeconds;
+  double _lifeLeft;
   bool _expired = false;
 
   @override

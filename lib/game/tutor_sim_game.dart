@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flame/game.dart';
@@ -9,6 +10,7 @@ import 'events/game_event_manager.dart';
 import 'sprites.dart';
 import 'students/student_factory.dart';
 import 'students/student_npc.dart';
+import 'students/student_personality.dart';
 import 'tutor/tutor_player.dart';
 import 'world/cluster_room.dart';
 
@@ -43,11 +45,16 @@ class TutorSimGame extends FlameGame {
 
   final List<StudentNpc> _students = [];
   final List<StudentNpc?> _seatOccupants = [];
+  final List<String> _studentLoginQueue = [];
   final Random _random = Random();
   late final TutorPlayer _tutor;
   late final GameEventManager _eventManager;
   final Map<String, int> _tigHoursByLogin = {};
+  final Map<StudentNpc, double> _studentStayTimers = {};
+  int _populationTargetCount = 0;
   double _tigToastTimer = 0;
+  double _nextSpawnIn = GameConfig.studentSpawnIntervalMin;
+  bool _spawningStudent = false;
 
   int get studentSeatCount => room.seats.length;
 
@@ -82,6 +89,7 @@ class TutorSimGame extends FlameGame {
   void update(double dt) {
     super.update(dt);
     _updateCamera(dt);
+    _updatePopulation(dt);
 
     // Refresh the debug HUD from the live held-keys set.
     final parts = <String>[];
@@ -121,6 +129,10 @@ class TutorSimGame extends FlameGame {
     _tigHoursByLogin[student.login] = hours;
     tigToast.value = '${student.login} got $hours-hour TIG';
     _tigToastTimer = 3;
+    unawaited(student.sayCaught());
+    if (_random.nextDouble() < student.personality.quitAfterTigChance) {
+      _sendStudentHome(student, showBubble: false);
+    }
   }
 
   bool _held(LogicalKeyboardKey a, LogicalKeyboardKey b) =>
@@ -142,6 +154,8 @@ class TutorSimGame extends FlameGame {
       student.removeFromParent();
     }
     _students.clear();
+    _studentStayTimers.clear();
+    _studentLoginQueue.clear();
     await _spawnStudents(logins);
   }
 
@@ -160,11 +174,16 @@ class TutorSimGame extends FlameGame {
     _seatOccupants
       ..clear()
       ..addAll(List<StudentNpc?>.filled(room.seats.length, null));
+    final initialCount = min(GameConfig.targetStudentCount, room.seats.length);
+    _populationTargetCount = min(initialCount, logins.length);
+    final initialLogins = logins.take(initialCount).toList();
+    _studentLoginQueue.addAll(logins.skip(initialLogins.length));
     final students = StudentFactory(
       room,
-      logins,
+      initialLogins,
       releaseSeat: _releaseSeat,
       requestSeat: _requestSeat,
+      onExited: _handleStudentExited,
     ).spawnAll();
     _students.addAll(students);
     for (final student in students) {
@@ -174,14 +193,107 @@ class TutorSimGame extends FlameGame {
       }
     }
     for (final student in students) {
+      _assignStayTimer(student);
       await world.add(student);
     }
+  }
+
+  void _updatePopulation(double dt) {
+    final transitionInProgress = _students.any(
+      (student) => student.isLeavingCluster || !student.isSeated,
+    );
+
+    if (!transitionInProgress) {
+      for (final student in List<StudentNpc>.of(_students)) {
+        if (student.hasExitedCluster || !student.isSeated) continue;
+
+        final nextTime =
+            (_studentStayTimers[student] ?? _randomStaySeconds()) - dt;
+        if (nextTime <= 0) {
+          _sendStudentHome(student);
+          break;
+        } else {
+          _studentStayTimers[student] = nextTime;
+        }
+      }
+    }
+
+    if (_spawningStudent || _studentLoginQueue.isEmpty) return;
+    if (_students.length >= _populationTargetCount) return;
+    if (transitionInProgress) return;
+
+    _nextSpawnIn -= dt;
+    if (_nextSpawnIn > 0) return;
+
+    _nextSpawnIn = _randomSpawnDelay();
+    unawaited(_spawnStudentFromGate());
+  }
+
+  Future<void> _spawnStudentFromGate() async {
+    if (_spawningStudent || _studentLoginQueue.isEmpty) return;
+    _spawningStudent = true;
+    final login = _studentLoginQueue.removeAt(0);
+
+    final student = StudentNpc(
+      login: login,
+      position: room.gateSpawnPoint,
+      direction: CharacterDirection.down,
+      currentSeatIndex: null,
+      findPath: room.findPath,
+      randomWalkablePoint: room.randomWalkablePoint,
+      releaseSeat: _releaseSeat,
+      requestSeat: _requestSeat,
+      onExited: _handleStudentExited,
+    );
+    final assignment = _requestSeat(student);
+    if (assignment == null || !student.claimSeat(assignment)) {
+      _releaseSeat(student);
+      _studentLoginQueue.add(login);
+      _spawningStudent = false;
+      return;
+    }
+
+    _students.add(student);
+    _assignStayTimer(student);
+    await world.add(student);
+    _spawningStudent = false;
+  }
+
+  void _sendStudentHome(StudentNpc student, {bool showBubble = true}) {
+    _studentStayTimers.remove(student);
+    student.leaveCluster(room.gateSpawnPoint, showBubble: showBubble);
+  }
+
+  void _handleStudentExited(StudentNpc student) {
+    _releaseSeat(student);
+    _studentStayTimers.remove(student);
+    _students.remove(student);
+    if (!_studentLoginQueue.contains(student.login)) {
+      _studentLoginQueue.add(student.login);
+    }
+  }
+
+  void _assignStayTimer(StudentNpc student) {
+    _studentStayTimers[student] = _randomStaySeconds();
+  }
+
+  double _randomStaySeconds() {
+    final range =
+        GameConfig.studentStayMaxSeconds - GameConfig.studentStayMinSeconds;
+    return GameConfig.studentStayMinSeconds + _random.nextDouble() * range;
+  }
+
+  double _randomSpawnDelay() {
+    final range =
+        GameConfig.studentSpawnIntervalMax - GameConfig.studentSpawnIntervalMin;
+    return GameConfig.studentSpawnIntervalMin + _random.nextDouble() * range;
   }
 
   void _releaseSeat(StudentNpc student) {
     final seatIndex = student.currentSeatIndex;
     if (seatIndex == null || seatIndex >= _seatOccupants.length) return;
     if (_seatOccupants[seatIndex] == student) _seatOccupants[seatIndex] = null;
+    student.currentSeatIndex = null;
   }
 
   StudentSeatAssignment? _requestSeat(StudentNpc student) {

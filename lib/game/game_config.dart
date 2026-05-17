@@ -18,11 +18,16 @@ class GameConfig {
   static const int tutorCharacterRow = 0;
 
   // Student
+  static const int targetStudentCount = 24;
   static const double studentRadius = 16;
   static const double studentWalkSpeed = 70;
-  static const double studentWanderChancePerSecond = 0.006;
+  static const double studentWanderChancePerSecond = 0.002;
   static const double studentWanderPauseMin = 1.2;
   static const double studentWanderPauseMax = 3.0;
+  static const double studentStayMinSeconds = 150;
+  static const double studentStayMaxSeconds = 300;
+  static const double studentSpawnIntervalMin = 12;
+  static const double studentSpawnIntervalMax = 24;
 
   // Desk + accessories
   static const int deskCols = 4;

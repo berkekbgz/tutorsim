@@ -21,3 +21,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+  fonts:
+    - family: PressStart2P
+      fonts:
+        - asset: assets/PressStart2P-Regular.ttf

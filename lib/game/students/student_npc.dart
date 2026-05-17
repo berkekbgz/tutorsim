@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flame/components.dart';
 
 import '../game_config.dart';
 import '../name_tag.dart';
+import '../speech_bubble.dart';
 import '../sprites.dart';
+import 'student_personality.dart';
 
 class StudentSeatAssignment {
   const StudentSeatAssignment({
@@ -28,8 +31,11 @@ class StudentNpc extends PositionComponent {
     required this.randomWalkablePoint,
     required this.releaseSeat,
     required this.requestSeat,
+    required this.onExited,
+    StudentPersonality? personality,
   }) : seatPosition = position.clone(),
        seatDirection = direction,
+       personality = personality ?? personalityForLogin(login),
        super(
          position: position,
          size: Vector2.all(GameConfig.studentRadius * 2),
@@ -43,6 +49,8 @@ class StudentNpc extends PositionComponent {
   final Vector2 Function(Random random, double radius) randomWalkablePoint;
   final void Function(StudentNpc student) releaseSeat;
   final StudentSeatAssignment? Function(StudentNpc student) requestSeat;
+  final void Function(StudentNpc student) onExited;
+  final StudentPersonality personality;
   final Random _random = Random();
 
   int? currentSeatIndex;
@@ -52,11 +60,18 @@ class StudentNpc extends PositionComponent {
   late final SpriteAnimationComponent _sprite;
   late final Map<CharacterDirection, SpriteAnimation> _idleAnimations;
   late final Map<CharacterDirection, SpriteAnimation> _walkAnimations;
+  SpeechBubble? _bubble;
   CharacterDirection _facing = CharacterDirection.down;
   final List<Vector2> _path = [];
   Vector2? _moveTarget;
   StudentSeatAssignment? _destinationSeat;
   double _pauseLeft = 0;
+  bool _leavingCluster = false;
+  bool _hasExitedCluster = false;
+
+  bool get isLeavingCluster => _leavingCluster;
+
+  bool get hasExitedCluster => _hasExitedCluster;
 
   bool get isSeated {
     return currentSeatIndex != null &&
@@ -103,9 +118,19 @@ class StudentNpc extends PositionComponent {
 
   void hideEventMark() {}
 
+  Future<void> sayEventStarted() async {
+    await _showRandomBubble(personality.eventLines);
+  }
+
+  Future<void> sayCaught() async {
+    await _showRandomBubble(personality.caughtLines);
+  }
+
   @override
   void update(double dt) {
     super.update(dt);
+
+    if (_hasExitedCluster) return;
 
     if (_moveTarget != null) {
       _stepTowardTarget(dt);
@@ -120,13 +145,16 @@ class StudentNpc extends PositionComponent {
       return;
     }
 
-    if (currentSeatIndex == null) {
+    if (currentSeatIndex == null && !_leavingCluster) {
       _pathToOpenSeat();
       return;
     }
 
     if (isSeated &&
-        _random.nextDouble() < GameConfig.studentWanderChancePerSecond * dt) {
+        _random.nextDouble() <
+            GameConfig.studentWanderChancePerSecond *
+                personality.wanderChanceMultiplier *
+                dt) {
       final target = randomWalkablePoint(_random, GameConfig.studentRadius);
       if (_startPathTo(target)) _leaveSeat();
     }
@@ -142,6 +170,13 @@ class StudentNpc extends PositionComponent {
       if (_moveTarget != null) return;
 
       _setIdleAnimation();
+      if (_leavingCluster) {
+        _hasExitedCluster = true;
+        removeFromParent();
+        onExited(this);
+        return;
+      }
+
       final destinationSeat = _destinationSeat;
       if (destinationSeat != null) {
         currentSeatIndex = destinationSeat.index;
@@ -149,6 +184,9 @@ class StudentNpc extends PositionComponent {
         seatDirection = destinationSeat.direction;
         _destinationSeat = null;
         _setIdleAnimation();
+        if (_random.nextDouble() < 0.16) {
+          unawaited(_showRandomBubble(personality.arrivalLines));
+        }
       } else {
         _pauseLeft = _randomPause();
       }
@@ -171,6 +209,41 @@ class StudentNpc extends PositionComponent {
     return true;
   }
 
+  bool claimSeat(StudentSeatAssignment assignment) {
+    if (_leavingCluster || _hasExitedCluster) return false;
+
+    currentSeatIndex = assignment.index;
+    seatPosition = assignment.position.clone();
+    seatDirection = assignment.direction;
+    _destinationSeat = assignment;
+    _pauseLeft = 0;
+    if (_startPathTo(assignment.position)) return true;
+
+    _destinationSeat = null;
+    releaseSeat(this);
+    currentSeatIndex = null;
+    return false;
+  }
+
+  void leaveCluster(Vector2 exitPoint, {bool showBubble = true}) {
+    if (_leavingCluster || _hasExitedCluster) return;
+
+    _leavingCluster = true;
+    _destinationSeat = null;
+    _pauseLeft = 0;
+    _path.clear();
+    _moveTarget = null;
+    _leaveSeat();
+    if (showBubble && _random.nextDouble() < 0.22) {
+      unawaited(_showRandomBubble(personality.leavingLines));
+    }
+    if (_startPathTo(exitPoint)) return;
+
+    _hasExitedCluster = true;
+    removeFromParent();
+    onExited(this);
+  }
+
   void _leaveSeat() {
     if (currentSeatIndex == null) return;
     releaseSeat(this);
@@ -178,11 +251,12 @@ class StudentNpc extends PositionComponent {
   }
 
   void _pathToOpenSeat() {
+    if (_leavingCluster) return;
+
     final assignment = requestSeat(this);
     if (assignment == null) return;
 
-    _destinationSeat = assignment;
-    if (!_startPathTo(assignment.position)) _destinationSeat = null;
+    if (!claimSeat(assignment)) releaseSeat(this);
   }
 
   double _randomPause() {
@@ -214,5 +288,18 @@ class StudentNpc extends PositionComponent {
     }
     _facing = seatDirection;
     _sprite.playing = false;
+  }
+
+  Future<void> _showRandomBubble(List<String> lines) async {
+    if (lines.isEmpty || isRemoved || _hasExitedCluster) return;
+
+    final line = lines[_random.nextInt(lines.length)];
+    _bubble?.removeFromParent();
+    final bubble = SpeechBubble(
+      text: line,
+      position: Vector2(GameConfig.studentRadius, -28),
+    );
+    _bubble = bubble;
+    await add(bubble);
   }
 }

@@ -1,12 +1,15 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flame/components.dart';
 
 import '../game_config.dart';
 import '../students/student_npc.dart';
+import '../students/student_personality.dart';
 import '../tutor_sim_game.dart';
 import 'event_mark_indicator.dart';
 import 'types/bottle_drop_event.dart';
+import 'types/coffee_put_event.dart';
 
 class GameEventManager extends Component {
   GameEventManager(this.game);
@@ -35,33 +38,39 @@ class GameEventManager extends Component {
   void _triggerRandomEvent() {
     if (game.room.eventSpots.isEmpty) return;
 
-    final eligibleSpotIndices = <int>[];
+    final eligibleSpots = <_EligibleEventSpot>[];
     for (int i = 0; i < game.room.eventSpots.length; i++) {
       final seatIndex = game.room.eventSeatIndices[i];
       final seatAlreadyHasEvent = _activeEvents.any(
         (active) => active.seatIndex == seatIndex,
       );
-      if (!seatAlreadyHasEvent && game.studentAtSeat(seatIndex) != null) {
-        eligibleSpotIndices.add(i);
+      final student = game.studentAtSeat(seatIndex);
+      if (!seatAlreadyHasEvent && student != null) {
+        eligibleSpots.add(
+          _EligibleEventSpot(
+            spotIndex: i,
+            student: student,
+            weight: student.personality.eventWeightMultiplier,
+          ),
+        );
       }
     }
-    if (eligibleSpotIndices.isEmpty) return;
+    if (eligibleSpots.isEmpty) return;
 
-    final spotIndex =
-        eligibleSpotIndices[_random.nextInt(eligibleSpotIndices.length)];
+    final eligibleSpot = _pickWeightedSpot(eligibleSpots);
+    final spotIndex = eligibleSpot.spotIndex;
     final spot = game.room.eventSpots[spotIndex];
     final seatIndex = game.room.eventSeatIndices[spotIndex];
-    final student = game.studentAtSeat(seatIndex);
-    final mark = student == null
-        ? null
-        : EventMarkIndicator(game: game, target: student);
-    if (mark != null) game.world.add(mark);
+    final student = eligibleSpot.student;
+    final mark = EventMarkIndicator(game: game, target: student);
+    game.world.add(mark);
 
     late final _ActiveGameEvent active;
-    final event = BottleDropEvent(
-      position: spot.clone(),
+    final event = _buildRandomEvent(
+      spot,
+      student: student,
       onExpired: () {
-        mark?.removeFromParent();
+        mark.removeFromParent();
         _activeEvents.remove(active);
       },
     );
@@ -73,6 +82,45 @@ class GameEventManager extends Component {
     );
     _activeEvents.add(active);
     game.world.add(event);
+    unawaited(student.sayEventStarted());
+  }
+
+  PositionComponent _buildRandomEvent(
+    Vector2 spot, {
+    required StudentNpc student,
+    required void Function() onExpired,
+  }) {
+    final personality = student.personality;
+    final coffeeWeight = personality.coffeeEventWeight;
+    final bottleWeight = personality.bottleEventWeight;
+    final duration =
+        GameConfig.bottleEventVisibleSeconds *
+        personality.eventDurationMultiplier;
+
+    if (_random.nextDouble() * (coffeeWeight + bottleWeight) < coffeeWeight) {
+      return CoffeePutEvent(
+        position: spot.clone(),
+        visibleSeconds: duration,
+        onExpired: onExpired,
+      );
+    }
+
+    return BottleDropEvent(
+      position: spot.clone(),
+      visibleSeconds: duration,
+      onExpired: onExpired,
+    );
+  }
+
+  _EligibleEventSpot _pickWeightedSpot(List<_EligibleEventSpot> spots) {
+    final totalWeight = spots.fold<double>(0, (sum, spot) => sum + spot.weight);
+    var cursor = _random.nextDouble() * totalWeight;
+    for (final spot in spots) {
+      cursor -= spot.weight;
+      if (cursor <= 0) return spot;
+    }
+
+    return spots.last;
   }
 
   void _cancelEventsForStudentsWhoLeftSeats() {
@@ -118,6 +166,18 @@ class GameEventManager extends Component {
   }
 }
 
+class _EligibleEventSpot {
+  const _EligibleEventSpot({
+    required this.spotIndex,
+    required this.student,
+    required this.weight,
+  });
+
+  final int spotIndex;
+  final StudentNpc student;
+  final double weight;
+}
+
 class _ActiveGameEvent {
   _ActiveGameEvent({
     required this.event,
@@ -126,7 +186,7 @@ class _ActiveGameEvent {
     this.mark,
   });
 
-  final BottleDropEvent event;
+  final PositionComponent event;
   final int seatIndex;
   final StudentNpc? student;
   final EventMarkIndicator? mark;

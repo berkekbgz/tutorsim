@@ -30,6 +30,10 @@ class ClusterRoom extends PositionComponent {
   /// Direction each seated student should face based on table side.
   final List<CharacterDirection> seatDirections = [];
 
+  /// Off-room staff corridor spawn. NPCs can use it, but the tutor remains
+  /// blocked by the room bounds.
+  Vector2 get gateSpawnPoint => Vector2(GameConfig.roomWidth / 2, -48);
+
   /// Accessories on the benches (computer or tablet). Will be used by
   /// the photo / violation systems later.
   final List<DeskAccessory> accessories = [];
@@ -276,6 +280,16 @@ class ClusterRoom extends PositionComponent {
   // Cached paints — render() runs every frame.
   static final _floorPaint = Paint()..filterQuality = FilterQuality.none;
   static final _wallPaint = Paint()..color = GameConfig.wallColor;
+  static final _corridorPaint = Paint()..color = const Color(0xFF151923);
+  static final _corridorEdgePaint = Paint()
+    ..color = const Color(0xFF596275)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2;
+  static final _doorPaint = Paint()..color = const Color(0xFF0E1119);
+  static final _doorEdgePaint = Paint()
+    ..color = const Color(0xFF8C95A8)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2;
   static final _benchFill = Paint()..color = GameConfig.deskColor;
   static final _benchEdge = Paint()
     ..color = GameConfig.deskEdgeColor
@@ -290,11 +304,27 @@ class ClusterRoom extends PositionComponent {
 
     _renderFloor(canvas, w, h);
 
+    final corridor = Rect.fromCenter(
+      center: Offset(w / 2, -36),
+      width: 128,
+      height: 96,
+    );
+    canvas.drawRect(corridor, _corridorPaint);
+    canvas.drawRect(corridor, _corridorEdgePaint);
+
     // Walls (four edge bands).
     canvas.drawRect(Rect.fromLTWH(0, 0, w, t), _wallPaint);
     canvas.drawRect(Rect.fromLTWH(0, h - t, w, t), _wallPaint);
     canvas.drawRect(Rect.fromLTWH(0, 0, t, h), _wallPaint);
     canvas.drawRect(Rect.fromLTWH(w - t, 0, t, h), _wallPaint);
+
+    final staffDoor = Rect.fromCenter(
+      center: Offset(w / 2, t / 2),
+      width: 72,
+      height: t,
+    );
+    canvas.drawRect(staffDoor, _doorPaint);
+    canvas.drawRect(staffDoor, _doorEdgePaint);
 
     // Merged benches: one rounded rect per row.
     for (final b in benchRects) {

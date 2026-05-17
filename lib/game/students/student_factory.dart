@@ -9,12 +9,14 @@ class StudentFactory {
     this.logins, {
     required this.releaseSeat,
     required this.requestSeat,
+    required this.onExited,
   });
 
   final ClusterRoom room;
   final List<String> logins;
   final void Function(StudentNpc student) releaseSeat;
   final StudentSeatAssignment? Function(StudentNpc student) requestSeat;
+  final void Function(StudentNpc student) onExited;
 
   List<StudentNpc> spawnAll() {
     final result = <StudentNpc>[];
@@ -34,6 +36,7 @@ class StudentFactory {
           randomWalkablePoint: room.randomWalkablePoint,
           releaseSeat: releaseSeat,
           requestSeat: requestSeat,
+          onExited: onExited,
         ),
       );
     }
