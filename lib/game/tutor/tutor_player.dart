@@ -100,20 +100,11 @@ class TutorPlayer extends PositionComponent {
 
     if (!moving) return;
 
-    final step = _input * GameConfig.tutorSpeed * dt;
-    final r = GameConfig.tutorRadius;
-    final minX = r + GameConfig.wallThickness;
-    final maxX = GameConfig.roomWidth - r - GameConfig.wallThickness;
-    final minY = r + GameConfig.wallThickness;
-    final maxY = GameConfig.roomHeight - r - GameConfig.wallThickness;
-
-    // Try X and Y independently so we slide along walls/benches instead
-    // of getting fully stuck on contact.
-    final tryX = Vector2((position.x + step.x).clamp(minX, maxX), position.y);
-    if (!room.isBlocked(tryX, r)) position.x = tryX.x;
-
-    final tryY = Vector2(position.x, (position.y + step.y).clamp(minY, maxY));
-    if (!room.isBlocked(tryY, r)) position.y = tryY.y;
+    position = room.moveCircle(
+      position,
+      _input * GameConfig.tutorSpeed * dt,
+      GameConfig.tutorRadius,
+    );
   }
 
   void _readInput(Set<LogicalKeyboardKey> keys) {

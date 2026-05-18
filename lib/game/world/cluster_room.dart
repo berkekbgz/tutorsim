@@ -50,6 +50,8 @@ class ClusterRoom extends PositionComponent {
   static const double _benchStartY = 300;
   static const double _rowSpacingY = 120;
   static const double _pathCellSize = 32;
+  static const double _collisionEpsilon = 0.05;
+  static const int _collisionResolvePasses = 3;
 
   late final Image _floorTile;
   late final Image _roadTileTrfLights;
@@ -80,10 +82,7 @@ class ClusterRoom extends PositionComponent {
             ? benchY + 6
             : benchY + GameConfig.deskHeight - accH - 6;
         await add(
-          Computer(
-            position: Vector2(accX, accY),
-            facingBack: screenFacesUp,
-          ),
+          Computer(position: Vector2(accX, accY), facingBack: screenFacesUp),
         );
         accessories.add(
           DeskAccessory(
@@ -146,6 +145,71 @@ class ClusterRoom extends PositionComponent {
       return false;
     }
     return !isBlocked(center, radius);
+  }
+
+  /// Moves a circular character while resolving bench/wall collisions.
+  ///
+  /// Axis-only collision checks can deadlock against bench corners: the X probe
+  /// and Y probe both overlap the corner even though a small tangential slide is
+  /// possible. This resolver applies the full movement, then pushes the circle
+  /// out of any overlapped bench, which naturally slides around corners.
+  Vector2 moveCircle(Vector2 center, Vector2 delta, double radius) {
+    final minX = GameConfig.wallThickness + radius;
+    final maxX = GameConfig.roomWidth - GameConfig.wallThickness - radius;
+    final minY = GameConfig.wallThickness + radius;
+    final maxY = GameConfig.roomHeight - GameConfig.wallThickness - radius;
+    final radiusSquared = radius * radius;
+
+    final next = center + delta;
+    next.x = next.x.clamp(minX, maxX).toDouble();
+    next.y = next.y.clamp(minY, maxY).toDouble();
+
+    for (int pass = 0; pass < _collisionResolvePasses; pass++) {
+      var adjusted = false;
+
+      for (final rect in benchRects) {
+        final closest = Vector2(
+          next.x.clamp(rect.left, rect.right).toDouble(),
+          next.y.clamp(rect.top, rect.bottom).toDouble(),
+        );
+        final offset = next - closest;
+        final distanceSquared = offset.length2;
+        if (distanceSquared >= radiusSquared) continue;
+
+        if (distanceSquared > 0.0001) {
+          final distance = math.sqrt(distanceSquared);
+          next.add(offset / distance * (radius - distance + _collisionEpsilon));
+        } else {
+          _pushCircleOutOfRect(next, rect, radius);
+        }
+
+        next.x = next.x.clamp(minX, maxX).toDouble();
+        next.y = next.y.clamp(minY, maxY).toDouble();
+        adjusted = true;
+      }
+
+      if (!adjusted) break;
+    }
+
+    return next;
+  }
+
+  void _pushCircleOutOfRect(Vector2 center, Rect rect, double radius) {
+    final left = (center.x - rect.left).abs();
+    final right = (rect.right - center.x).abs();
+    final top = (center.y - rect.top).abs();
+    final bottom = (rect.bottom - center.y).abs();
+    final nearest = math.min(math.min(left, right), math.min(top, bottom));
+
+    if (nearest == left) {
+      center.x = rect.left - radius - _collisionEpsilon;
+    } else if (nearest == right) {
+      center.x = rect.right + radius + _collisionEpsilon;
+    } else if (nearest == top) {
+      center.y = rect.top - radius - _collisionEpsilon;
+    } else {
+      center.y = rect.bottom + radius + _collisionEpsilon;
+    }
   }
 
   Vector2 randomWalkablePoint(math.Random random, double radius) {

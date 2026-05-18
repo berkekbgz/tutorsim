@@ -61,6 +61,7 @@ class TutorSimGame extends FlameGame {
   final ValueNotifier<double> tigMetre = ValueNotifier<double>(
     GameConfig.tigMetreStart.toDouble(),
   );
+
   /// Wall-clock seconds the player has survived in this run. Runs
   /// indefinitely — there's no shift cap any more. Mirrors the private
   /// `_elapsed` counter so the HUD can read it via ValueListenableBuilder.
@@ -621,6 +622,7 @@ class TutorSimGame extends FlameGame {
       currentSeatIndex: null,
       findPath: room.findPath,
       randomWalkablePoint: room.randomWalkablePoint,
+      resolveMovement: room.moveCircle,
       releaseSeat: _releaseSeat,
       requestSeat: _requestSeat,
       onExited: _handleStudentExited,

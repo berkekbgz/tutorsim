@@ -34,6 +34,7 @@ class StudentFactory {
           currentSeatIndex: i,
           findPath: room.findPath,
           randomWalkablePoint: room.randomWalkablePoint,
+          resolveMovement: room.moveCircle,
           releaseSeat: releaseSeat,
           requestSeat: requestSeat,
           onExited: onExited,

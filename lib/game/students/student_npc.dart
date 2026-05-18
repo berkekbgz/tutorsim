@@ -38,6 +38,7 @@ class StudentNpc extends PositionComponent {
     required this.currentSeatIndex,
     required this.findPath,
     required this.randomWalkablePoint,
+    required this.resolveMovement,
     required this.releaseSeat,
     required this.requestSeat,
     required this.onExited,
@@ -56,6 +57,8 @@ class StudentNpc extends PositionComponent {
   final List<Vector2> Function(Vector2 start, Vector2 goal, double radius)
   findPath;
   final Vector2 Function(Random random, double radius) randomWalkablePoint;
+  final Vector2 Function(Vector2 center, Vector2 delta, double radius)
+  resolveMovement;
   final void Function(StudentNpc student) releaseSeat;
   final StudentSeatAssignment? Function(StudentNpc student) requestSeat;
   final void Function(StudentNpc student) onExited;
@@ -113,8 +116,7 @@ class StudentNpc extends PositionComponent {
     final reservedRows = _reservedCharacterRows.values.toSet();
     final pool = CharacterSprites.rows
         .where(
-          (r) =>
-              r != GameConfig.tutorCharacterRow && !reservedRows.contains(r),
+          (r) => r != GameConfig.tutorCharacterRow && !reservedRows.contains(r),
         )
         .toList();
     final row =
@@ -220,7 +222,12 @@ class StudentNpc extends PositionComponent {
     }
 
     final directionVector = delta / distance;
-    position += directionVector * GameConfig.studentWalkSpeed * dt;
+    final step = directionVector * GameConfig.studentWalkSpeed * dt;
+    if (_leavingCluster && target.y < GameConfig.wallThickness) {
+      position += step;
+    } else {
+      position = resolveMovement(position, step, GameConfig.studentRadius);
+    }
     _setWalkAnimation(_directionFor(directionVector));
   }
 
