@@ -8,6 +8,7 @@ class GameConfig {
   static const double roomWidth = 640;
   static const double roomHeight = 1664;
   static const double wallThickness = 24;
+  static const double rightSceneryWidth = 320;
 
   // Tutor
   static const double tutorRadius = 16;
@@ -72,8 +73,7 @@ class GameConfig {
   static const double difficultyRampSeconds = 300;
   static const int maxActiveEventsCeiling = 6;
 
-  // Shift / HUD initial values
-  static const double shiftSeconds = 300; // 5-minute shift
+  // HUD initial values
   static const int startScore = 0;
 
   // Camera

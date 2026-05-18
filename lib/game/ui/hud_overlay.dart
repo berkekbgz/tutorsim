@@ -52,7 +52,7 @@ class HudOverlay extends StatelessWidget {
                           ),
                           const _Divider(),
                           ValueListenableBuilder<double>(
-                            valueListenable: game.timeLeft,
+                            valueListenable: game.elapsedSeconds,
                             builder: (_, v, _) =>
                                 _Stat(label: 'TIME', value: _formatTime(v)),
                           ),
@@ -123,7 +123,9 @@ class HudOverlay extends StatelessWidget {
   }
 
   static String _formatTime(double seconds) {
-    final s = seconds.ceil().clamp(0, 9999);
+    // Count-up display: floor so the visible second matches what's
+    // already elapsed (e.g., 30.7s reads as 00:30, not 00:31).
+    final s = seconds.floor().clamp(0, 9999);
     final mm = (s ~/ 60).toString().padLeft(2, '0');
     final ss = (s % 60).toString().padLeft(2, '0');
     return '$mm:$ss';

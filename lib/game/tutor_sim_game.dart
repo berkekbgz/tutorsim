@@ -37,6 +37,7 @@ class TutorSimGame extends FlameGame {
   static const _sfxBossHit = 'Boss hit 1.wav';
   static const _sfxAlarm = 'Digital_Alarm.wav';
   static const _sfxSplash = 'Water_Splash.wav';
+  static const _sfxCoin = 'driken5482-retro-coin-4-236671.mp3';
 
   static final AudioContext _sfxAudioContext = AudioContextConfig(
     focus: AudioContextConfigFocus.mixWithOthers,
@@ -60,9 +61,10 @@ class TutorSimGame extends FlameGame {
   final ValueNotifier<double> tigMetre = ValueNotifier<double>(
     GameConfig.tigMetreStart.toDouble(),
   );
-  final ValueNotifier<double> timeLeft = ValueNotifier<double>(
-    GameConfig.shiftSeconds,
-  );
+  /// Wall-clock seconds the player has survived in this run. Runs
+  /// indefinitely — there's no shift cap any more. Mirrors the private
+  /// `_elapsed` counter so the HUD can read it via ValueListenableBuilder.
+  final ValueNotifier<double> elapsedSeconds = ValueNotifier<double>(0);
 
   /// Debug echo of the active movement keys. Visible in the HUD so we
   /// can immediately see whether key tracking is healthy.
@@ -120,6 +122,7 @@ class TutorSimGame extends FlameGame {
   AudioPool? _bossHitPool;
   AudioPool? _alarmPool;
   AudioPool? _splashPool;
+  AudioPool? _coinPool;
   double _elapsed = 0;
   double _shakeMagnitude = 0;
   double _shakeTimeLeft = 0;
@@ -165,6 +168,7 @@ class TutorSimGame extends FlameGame {
     unawaited(_bossHitPool?.dispose() ?? Future<void>.value());
     unawaited(_alarmPool?.dispose() ?? Future<void>.value());
     unawaited(_splashPool?.dispose() ?? Future<void>.value());
+    unawaited(_coinPool?.dispose() ?? Future<void>.value());
     super.onRemove();
   }
 
@@ -178,6 +182,7 @@ class TutorSimGame extends FlameGame {
     _updateCamera(dt);
     _updatePopulation(dt);
     _elapsed += dt;
+    elapsedSeconds.value = _elapsed;
     difficulty.value = _computeDifficulty(_elapsed);
 
     // Refresh the debug HUD from the live held-keys set.
@@ -195,14 +200,6 @@ class TutorSimGame extends FlameGame {
       parts.add('D');
     }
     inputDebug.value = parts.isEmpty ? '-' : parts.join('');
-
-    if (timeLeft.value > 0) {
-      timeLeft.value = (timeLeft.value - dt).clamp(
-        0.0,
-        GameConfig.shiftSeconds,
-      );
-      if (timeLeft.value <= 0) _endGame('Shift over');
-    }
 
     // Continuous TIG metre drain, scaled by current difficulty so time
     // pressure compounds as the run goes on. Missed events deduct in
@@ -249,8 +246,8 @@ class TutorSimGame extends FlameGame {
     // vignette is the only screen-tinting effect, which keeps it
     // unambiguous: tinted screen = bad.
     // Capture SFX is event-specific: sleep gets the splash (a "snap out
-    // of it" cue), everything else gets the generic bump.
-    final captureSfx = capture.kindId == 'sleep' ? _sfxSplash : _sfxBump;
+    // of it" cue), everything else gets the generic retro-coin chime.
+    final captureSfx = capture.kindId == 'sleep' ? _sfxSplash : _sfxCoin;
     unawaited(_playSfx(captureSfx, volume: 0.7));
     unawaited(student.sayCaught());
     if (_random.nextDouble() < student.personality.quitAfterTigChance) {
@@ -277,11 +274,13 @@ class TutorSimGame extends FlameGame {
       _createSfxPool(_sfxBossHit, minPlayers: 2, maxPlayers: 4),
       _createSfxPool(_sfxAlarm, minPlayers: 2, maxPlayers: 3),
       _createSfxPool(_sfxSplash, minPlayers: 2, maxPlayers: 4),
+      _createSfxPool(_sfxCoin, minPlayers: 2, maxPlayers: 4),
     ]);
     _bumpPool = pools[0];
     _bossHitPool = pools[1];
     _alarmPool = pools[2];
     _splashPool = pools[3];
+    _coinPool = pools[4];
   }
 
   Future<AudioPool> _createSfxPool(
@@ -324,6 +323,7 @@ class TutorSimGame extends FlameGame {
       _sfxBossHit => _bossHitPool,
       _sfxAlarm => _alarmPool,
       _sfxSplash => _splashPool,
+      _sfxCoin => _coinPool,
       _ => null,
     };
   }
@@ -334,6 +334,9 @@ class TutorSimGame extends FlameGame {
       _sfxBump => const Duration(milliseconds: 250),
       _sfxSplash => const Duration(milliseconds: 550),
       _sfxAlarm => const Duration(milliseconds: 800),
+      // Coin clip is ~183ms; small tail margin so the full chime plays
+      // before the pool player is rearmed for the next capture.
+      _sfxCoin => const Duration(milliseconds: 220),
       _ => const Duration(milliseconds: 1000),
     };
   }
@@ -511,7 +514,7 @@ class TutorSimGame extends FlameGame {
     final halfW = size.x / (2 * zoom);
     final halfH = size.y / (2 * zoom);
     final minX = halfW;
-    final maxX = GameConfig.roomWidth - halfW;
+    final maxX = GameConfig.roomWidth + GameConfig.rightSceneryWidth - halfW;
     final minY = halfH;
     final maxY = GameConfig.roomHeight - halfH;
 

@@ -151,8 +151,16 @@ class GameEventManager extends Component {
         break;
       }
     }
+    // Sleep zzz reads as a thought-bubble over the NPC, not as a prop
+    // on the desk, so it ignores the desk-side event spot and anchors
+    // to the right of the seated NPC's head instead. Other event kinds
+    // still use the spot tied to their desk screen.
+    final position = chosen.id == 'sleep'
+        ? _sleepIndicatorPosition(student)
+        : spot.clone();
+
     final event = chosen.build(
-      position: spot.clone(),
+      position: position,
       visibleSeconds: visible,
       onExpired: onExpired,
     );
@@ -161,6 +169,20 @@ class GameEventManager extends Component {
       kindId: chosen.id,
       visibleSeconds: visible,
     );
+  }
+
+  Vector2 _sleepIndicatorPosition(StudentNpc student) {
+    // The eeping sprite is 24×24, centered. Offset it so its left edge
+    // sits just past the NPC's right shoulder and its center is at
+    // roughly head height (upper portion of the 32×32 NPC sprite).
+    const indicatorHalfWidth = 12.0;
+    const horizontalGap = 2.0;
+    const headLift = GameConfig.studentRadius / 2;
+    return student.position +
+        Vector2(
+          GameConfig.studentRadius + indicatorHalfWidth + horizontalGap,
+          -headLift,
+        );
   }
 
   _EligibleEventSpot _pickWeightedSpot(List<_EligibleEventSpot> spots) {

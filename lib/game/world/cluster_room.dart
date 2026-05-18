@@ -13,7 +13,12 @@ import '../sprites.dart';
 /// opposite directions so students sit on alternating sides of the bench.
 class ClusterRoom extends PositionComponent {
   ClusterRoom()
-    : super(size: Vector2(GameConfig.roomWidth, GameConfig.roomHeight));
+    : super(
+        size: Vector2(
+          GameConfig.roomWidth + GameConfig.rightSceneryWidth,
+          GameConfig.roomHeight,
+        ),
+      );
 
   /// World-space rectangles for the merged benches. Used for tutor blocking.
   final List<Rect> benchRects = [];
@@ -47,11 +52,14 @@ class ClusterRoom extends PositionComponent {
   static const double _pathCellSize = 32;
 
   late final Image _floorTile;
+  late final Image _roadTileTrfLights;
+  late final Image _roadTile;
 
   @override
   Future<void> onLoad() async {
     _floorTile = await Flame.images.load('floor.png');
-    var scrollingComputers = 0;
+    _roadTileTrfLights = await Flame.images.load('road1.png');
+    _roadTile = await Flame.images.load('road2.png');
 
     for (int r = 0; r < _rows; r++) {
       final benchY = _benchStartY + r * _rowSpacingY;
@@ -71,13 +79,10 @@ class ClusterRoom extends PositionComponent {
         final accY = screenFacesUp
             ? benchY + 6
             : benchY + GameConfig.deskHeight - accH - 6;
-        final scrolling = !screenFacesUp && scrollingComputers < 3;
-        if (scrolling) scrollingComputers++;
         await add(
           Computer(
             position: Vector2(accX, accY),
             facingBack: screenFacesUp,
-            scrolling: scrolling,
           ),
         );
         accessories.add(
@@ -303,6 +308,7 @@ class ClusterRoom extends PositionComponent {
     final t = GameConfig.wallThickness;
 
     _renderFloor(canvas, w, h);
+    _renderRightRoad(canvas, w, h);
 
     final corridor = Rect.fromCenter(
       center: Offset(w / 2, -36),
@@ -330,6 +336,53 @@ class ClusterRoom extends PositionComponent {
     for (final b in benchRects) {
       canvas.drawRect(b, _benchFill);
       canvas.drawRect(b, _benchEdge);
+    }
+  }
+
+  void _renderRightRoad(Canvas canvas, double roomWidth, double roomHeight) {
+    final roadWidth = GameConfig.rightSceneryWidth;
+    final firstSrc = Rect.fromLTWH(
+      0,
+      0,
+      _roadTileTrfLights.width.toDouble(),
+      _roadTileTrfLights.height.toDouble(),
+    );
+    final repeatSrc = Rect.fromLTWH(
+      0,
+      0,
+      _roadTile.width.toDouble(),
+      _roadTile.height.toDouble(),
+    );
+    final tileHeight = _roadTile.height * (roadWidth / _roadTile.width);
+
+    var y = 0.0;
+
+    while (y < roomHeight / 2) {
+      canvas.drawImageRect(
+        _roadTile,
+        firstSrc,
+        Rect.fromLTWH(roomWidth, y, roadWidth, tileHeight),
+        _floorPaint,
+      );
+      y += tileHeight;
+    }
+
+    canvas.drawImageRect(
+      _roadTileTrfLights,
+      firstSrc,
+      Rect.fromLTWH(roomWidth, y, roadWidth, tileHeight),
+      _floorPaint,
+    );
+    y += tileHeight;
+
+    while (y < roomHeight) {
+      canvas.drawImageRect(
+        _roadTile,
+        repeatSrc,
+        Rect.fromLTWH(roomWidth, y, roadWidth, tileHeight),
+        _floorPaint,
+      );
+      y += tileHeight;
     }
   }
 
