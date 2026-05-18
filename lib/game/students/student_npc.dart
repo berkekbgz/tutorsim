@@ -22,6 +22,14 @@ class StudentSeatAssignment {
   final CharacterDirection direction;
 }
 
+/// Logins that always wear a specific character row, regardless of the
+/// usual deterministic hash. Use this for in-jokes / dedicated outfits
+/// — the reserved row is also removed from the general student pool
+/// so no one else accidentally shares it.
+const Map<String, int> _reservedCharacterRows = {
+  'erearsla': 9, // orange-hat worker / overalls outfit
+};
+
 class StudentNpc extends PositionComponent {
   StudentNpc({
     required this.login,
@@ -100,11 +108,18 @@ class StudentNpc extends PositionComponent {
   @override
   Future<void> onLoad() async {
     // Pick a character deterministically per login so the same student
-    // always wears the same outfit between sessions. Skip the tutor row.
+    // always wears the same outfit between sessions. Skip the tutor row
+    // and any rows reserved for specific logins so they stay distinctive.
+    final reservedRows = _reservedCharacterRows.values.toSet();
     final pool = CharacterSprites.rows
-        .where((r) => r != GameConfig.tutorCharacterRow)
+        .where(
+          (r) =>
+              r != GameConfig.tutorCharacterRow && !reservedRows.contains(r),
+        )
         .toList();
-    final row = pool[login.hashCode.abs() % pool.length];
+    final row =
+        _reservedCharacterRows[login] ??
+        pool[login.hashCode.abs() % pool.length];
     _facing = seatDirection;
     _idleAnimations = {
       for (final direction in CharacterDirection.values)
